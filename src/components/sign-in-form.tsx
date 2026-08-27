@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import {
   completeGoogleRedirect,
-  isStandalone,
+  shouldUseRedirect,
   signInWithGooglePopup,
   signInWithGoogleRedirect,
 } from "@/lib/firebase/client";
@@ -66,7 +66,7 @@ export function SignInForm() {
   async function handleSignIn() {
     setLoading(true);
     try {
-      if (isStandalone()) {
+      if (shouldUseRedirect()) {
         try {
           sessionStorage.setItem(NEXT_KEY, params.get("next") || "/");
         } catch {}
@@ -76,8 +76,19 @@ export function SignInForm() {
       const idToken = await signInWithGooglePopup();
       await exchangeAndGo(idToken);
     } catch (err) {
-      console.error(err);
-      toast.error("No se pudo iniciar sesión con Google");
+      const code = (err as { code?: string })?.code;
+      console.error("sign-in error:", code, err);
+      if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
+        // fallback a redirect si el popup fue bloqueado
+        try {
+          sessionStorage.setItem(NEXT_KEY, params.get("next") || "/");
+          await signInWithGoogleRedirect();
+          return;
+        } catch {}
+      }
+      toast.error(
+        code ? `No se pudo iniciar sesión (${code})` : "No se pudo iniciar sesión con Google",
+      );
       setLoading(false);
     }
   }

@@ -33,14 +33,26 @@ export function getClientAuth(): Auth {
   return _auth;
 }
 
-/** El popup no funciona en una PWA instalada / navegador embebido. */
-export function isStandalone(): boolean {
+function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
   return (
     window.matchMedia?.("(display-mode: standalone)").matches ||
     // iOS Safari
     (window.navigator as unknown as { standalone?: boolean }).standalone === true
   );
+}
+
+/**
+ * El popup de Google no funciona confiablemente en móviles (Safari/Chrome
+ * mobile lo bloquean o lo abren en otra pestaña) ni en PWAs instaladas.
+ * Ahí usamos redirect; el popup queda sólo para desktop.
+ */
+export function shouldUseRedirect(): boolean {
+  if (typeof window === "undefined") return true;
+  if (isStandalone()) return true;
+  const coarsePointer = window.matchMedia?.("(pointer: coarse)").matches;
+  const smallScreen = window.innerWidth < 820;
+  return Boolean(coarsePointer || smallScreen);
 }
 
 const googleProvider = () => new GoogleAuthProvider();
