@@ -21,18 +21,13 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (hasSession && pathname === "/sign-in") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
-
+  // El "ya logueado -> /" se decide en /sign-in con verificación real del
+  // token; hacerlo acá con sólo la cookie causa loop si la sesión venció.
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|manifest.webmanifest|icon.svg).*)",
-  ],
+  // Excluye: api, _next, healthz y cualquier archivo con extensión
+  // (íconos .png/.svg, manifest, etc. — si no, el proxy los redirige a /sign-in).
+  matcher: ["/((?!api/|_next/|healthz|.*\\.[\\w]+$).*)"],
 };

@@ -5,9 +5,6 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 export function CosmicBackground() {
   const [mounted, setMounted] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const farRef = useRef<HTMLDivElement>(null);
-  const midRef = useRef<HTMLDivElement>(null);
-  const filRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => setMounted(true), []);
 
@@ -25,7 +22,7 @@ export function CosmicBackground() {
       x: number;
       y: number;
       r: number;
-      layer: number;
+      depth: number;
       a: number;
       ph: number;
       sp: number;
@@ -38,6 +35,7 @@ export function CosmicBackground() {
     let starCol = "#c8d3ef";
     let heroCol = "#6fffe9";
     let baseOpacity = 0.8;
+    let glow: HTMLCanvasElement | null = null;
 
     const readTheme = () => {
       const c = getComputedStyle(document.documentElement);
@@ -45,10 +43,20 @@ export function CosmicBackground() {
       heroCol = c.getPropertyValue("--glow").trim() || heroCol;
       const o = parseFloat(c.getPropertyValue("--star-far-opacity"));
       if (Number.isFinite(o)) baseOpacity = o;
+      // sprite de brillo pre-renderizado (una vez por tema)
+      const g = document.createElement("canvas");
+      g.width = g.height = 40;
+      const gc = g.getContext("2d")!;
+      const rad = gc.createRadialGradient(20, 20, 0, 20, 20, 20);
+      rad.addColorStop(0, heroCol);
+      rad.addColorStop(1, "transparent");
+      gc.fillStyle = rad;
+      gc.fillRect(0, 0, 40, 40);
+      glow = g;
     };
 
     const build = () => {
-      const count = Math.min(520, Math.round((W * H) / 4600));
+      const count = Math.min(280, Math.round((W * H) / 9000));
       stars = new Array(count);
       for (let i = 0; i < count; i++) {
         const layer =
@@ -62,11 +70,11 @@ export function CosmicBackground() {
               : layer === 1
                 ? 0.6 + Math.random() * 0.55
                 : 0.35 + Math.random() * 0.45,
-          layer,
+          depth: (layer + 1) / 3,
           a: 0.32 + Math.random() * 0.55,
           ph: Math.random() * Math.PI * 2,
-          sp: 0.12 + Math.random() * 0.45,
-          hero: Math.random() < 0.045,
+          sp: 0.1 + Math.random() * 0.4,
+          hero: Math.random() < 0.04,
         };
       }
     };
@@ -82,7 +90,7 @@ export function CosmicBackground() {
       build();
     };
 
-    // parallax objetivo (pointer) + suavizado
+    // parallax sutil (solo canvas), suavizado
     let px = 0;
     let py = 0;
     let tpx = 0;
@@ -93,52 +101,31 @@ export function CosmicBackground() {
     };
 
     let raf = 0;
+    let lastDraw = 0;
     const t0 = performance.now();
 
     const draw = (now: number) => {
       const t = (now - t0) / 1000;
-
-      // easing hacia el objetivo + deriva automática lenta
-      const k = reduce ? 1 : 0.03;
-      px += (tpx - px) * k;
-      py += (tpy - py) * k;
-      const ax = reduce ? 0 : Math.sin(t * 0.05) * 0.22;
-      const ay = reduce ? 0 : Math.cos(t * 0.043) * 0.18;
-      const gx = (px + ax) * 0.6;
-      const gy = (py + ay) * 0.6;
-
-      // mueve las capas CSS con la misma señal (suave)
-      if (farRef.current)
-        farRef.current.style.transform = `translate3d(${gx * 8}px, ${gy * 8}px, 0)`;
-      if (midRef.current)
-        midRef.current.style.transform = `translate3d(${gx * 18}px, ${gy * 18}px, 0)`;
-      if (filRef.current)
-        filRef.current.style.transform = `translate3d(${gx * 13}px, ${gy * 13}px, 0) rotate(${
-          reduce ? 0 : Math.sin(t * 0.02) * 2.4
-        }deg) scale(1.06)`;
+      px += (tpx - px) * (reduce ? 1 : 0.04);
+      py += (tpy - py) * (reduce ? 1 : 0.04);
+      const gx = px * 14;
+      const gy = py * 14;
 
       ctx.clearRect(0, 0, W, H);
       for (let i = 0; i < stars.length; i++) {
         const s = stars[i];
-        const depth = (s.layer + 1) / 3;
-        let x = s.x * W + gx * depth * 22;
-        let y = s.y * H + gy * depth * 22;
+        let x = s.x * W + gx * s.depth;
+        let y = s.y * H + gy * s.depth;
         x = ((x % W) + W) % W;
         y = ((y % H) + H) % H;
 
-        const tw = reduce ? 1 : 0.6 + 0.4 * Math.sin(t * s.sp + s.ph);
+        const tw = reduce ? 1 : 0.62 + 0.38 * Math.sin(t * s.sp + s.ph);
         const alpha = Math.max(0, s.a * baseOpacity * tw);
 
-        if (s.hero) {
-          const g = ctx.createRadialGradient(x, y, 0, x, y, s.r * 4.5);
-          g.addColorStop(0, heroCol);
-          g.addColorStop(1, "transparent");
-          ctx.globalAlpha = alpha * 0.7;
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.arc(x, y, s.r * 4.5, 0, 6.283);
-          ctx.fill();
-          ctx.globalAlpha = Math.min(1, alpha + 0.25);
+        if (s.hero && glow) {
+          ctx.globalAlpha = alpha * 0.6;
+          ctx.drawImage(glow, x - s.r * 5, y - s.r * 5, s.r * 10, s.r * 10);
+          ctx.globalAlpha = Math.min(1, alpha + 0.2);
           ctx.fillStyle = "#fff";
           ctx.beginPath();
           ctx.arc(x, y, s.r * 0.9, 0, 6.283);
@@ -155,7 +142,11 @@ export function CosmicBackground() {
     };
 
     const loop = (now: number) => {
-      draw(now);
+      // ~30fps: alcanza de sobra para el titileo del fondo
+      if (now - lastDraw >= 33) {
+        lastDraw = now;
+        draw(now);
+      }
       raf = requestAnimationFrame(loop);
     };
 
@@ -164,6 +155,7 @@ export function CosmicBackground() {
         cancelAnimationFrame(raf);
         raf = 0;
       } else if (!reduce && !raf) {
+        lastDraw = 0;
         raf = requestAnimationFrame(loop);
       }
     };
@@ -179,14 +171,12 @@ export function CosmicBackground() {
 
     resize();
     window.addEventListener("resize", resize, { passive: true });
-    window.addEventListener("pointermove", onMove, { passive: true });
+    if (!reduce)
+      window.addEventListener("pointermove", onMove, { passive: true });
     document.addEventListener("visibilitychange", onVisibility);
 
-    if (reduce) {
-      draw(performance.now());
-    } else {
-      raf = requestAnimationFrame(loop);
-    }
+    if (reduce) draw(performance.now());
+    else raf = requestAnimationFrame(loop);
 
     return () => {
       cancelAnimationFrame(raf);
@@ -232,120 +222,62 @@ export function CosmicBackground() {
       aria-hidden
       className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
     >
-      <svg width="0" height="0" className="absolute">
-        <filter id="cosmic-filaments" x="-20%" y="-20%" width="140%" height="140%">
-          <feTurbulence
-            type="fractalNoise"
-            baseFrequency="0.012 0.02"
-            numOctaves="3"
-            seed="11"
-            stitchTiles="stitch"
-            result="n"
-          />
-          <feColorMatrix
-            in="n"
-            type="matrix"
-            values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1.5 -0.62"
-            result="a"
-          />
-          <feComposite in="SourceGraphic" in2="a" operator="in" result="c" />
-          <feGaussianBlur in="c" stdDeviation="6" />
-        </filter>
-      </svg>
+      {/* Nebulosas: gradientes radiales suaves, sin blur() (el falloff del
+          gradiente ya difumina; blur(100px) sobre 60vmax es carísimo). */}
+      <div className="absolute inset-0">
 
-      {/* Capa lejana: nebulosas difuminadas */}
-      <div ref={farRef} className="absolute inset-0 will-change-transform">
         <div
-          className="absolute inset-0"
-          style={{ filter: "hue-rotate(var(--neb-hue, 0deg))" }}
-        >
-          <div
-            className="absolute -left-[15%] -top-[10%] h-[55vmax] w-[55vmax] rounded-full blur-[90px]"
-            style={{
-              background:
-                "radial-gradient(circle at 30% 30%, var(--neb-1), transparent 60%)",
-              animation: "nebula-drift 200s ease-in-out infinite",
-            }}
-          />
-          <div
-            className="absolute -right-[20%] top-[4%] h-[50vmax] w-[50vmax] rounded-full blur-[100px]"
-            style={{
-              background:
-                "radial-gradient(circle at 50% 50%, var(--neb-2), transparent 62%)",
-              animation: "nebula-drift 260s ease-in-out infinite reverse",
-            }}
-          />
-          <div
-            className="absolute bottom-[-25%] left-[18%] h-[60vmax] w-[60vmax] rounded-full blur-[110px]"
-            style={{
-              background:
-                "radial-gradient(circle at 50% 50%, var(--neb-3), transparent 60%)",
-              animation: "nebula-drift 320s ease-in-out infinite",
-            }}
-          />
-        </div>
+          className="absolute -left-[25%] -top-[25%] h-[85vmax] w-[85vmax]"
+          style={{
+            background:
+              "radial-gradient(circle at 40% 40%, var(--neb-1) 0%, transparent 55%)",
+          }}
+        />
+        <div
+          className="absolute -right-[30%] -top-[20%] h-[80vmax] w-[80vmax]"
+          style={{
+            background:
+              "radial-gradient(circle at 55% 45%, var(--neb-2) 0%, transparent 55%)",
+          }}
+        />
+        <div
+          className="absolute bottom-[-45%] left-[5%] h-[95vmax] w-[95vmax]"
+          style={{
+            background:
+              "radial-gradient(circle at 50% 45%, var(--neb-3) 0%, transparent 55%)",
+          }}
+        />
       </div>
 
-      {/* Filamentos de gas */}
-      <div
-        ref={filRef}
-        className="absolute inset-[-16%] will-change-transform"
-        style={{
-          opacity: 0.3,
-          mixBlendMode: "screen",
-          background:
-            "linear-gradient(120deg, var(--neb-2) 0%, var(--neb-1) 50%, var(--neb-3) 100%)",
-          WebkitMaskImage:
-            "radial-gradient(70% 60% at 50% 45%, #000 0%, transparent 82%)",
-          maskImage:
-            "radial-gradient(70% 60% at 50% 45%, #000 0%, transparent 82%)",
-          filter: "url(#cosmic-filaments)",
-        }}
-      />
-
-      {/* Capa intermedia: orbitas con objetos luminosos */}
-      <div
-        ref={midRef}
-        className="absolute inset-0 will-change-transform"
-        style={{ opacity: 0.4 }}
-      >
-        <div className="absolute right-[-10vmax] top-[45%] h-[42vmax] w-[42vmax] -translate-y-1/2">
+      {/* Orbitas decorativas (rotacion CSS, sin filtros) */}
+      <div className="absolute inset-0" style={{ opacity: 0.32 }}>
+        <div className="absolute right-[-12vmax] top-[45%] h-[40vmax] w-[40vmax] -translate-y-1/2">
           <div
-            className="absolute inset-0 rounded-full border"
+            className="absolute inset-0 rounded-full border will-change-transform"
             style={{
-              borderColor: "color-mix(in oklab, var(--cyan) 20%, transparent)",
-              animation: "orbit-spin 260s linear infinite",
+              borderColor: "color-mix(in oklab, var(--cyan) 18%, transparent)",
+              animation: "orbit-spin 280s linear infinite",
             }}
           >
             <div
-              className="absolute -top-1 left-1/2 h-2 w-2 -translate-x-1/2 rounded-full"
+              className="absolute -top-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full"
               style={{
                 background: "var(--glow)",
                 boxShadow:
-                  "0 0 16px 4px color-mix(in oklab, var(--glow) 50%, transparent)",
+                  "0 0 12px 3px color-mix(in oklab, var(--glow) 45%, transparent)",
               }}
             />
           </div>
           <div
-            className="absolute inset-[18%] rounded-full border"
+            className="absolute inset-[22%] rounded-full border"
             style={{
-              borderColor: "color-mix(in oklab, #3a506b 32%, transparent)",
-              animation: "orbit-spin 170s linear infinite reverse",
+              borderColor: "color-mix(in oklab, #3a506b 28%, transparent)",
             }}
-          >
-            <div
-              className="absolute top-1/2 -right-1 h-1.5 w-1.5 -translate-y-1/2 rounded-full"
-              style={{
-                background: "var(--cyan)",
-                boxShadow:
-                  "0 0 12px 3px color-mix(in oklab, var(--cyan) 45%, transparent)",
-              }}
-            />
-          </div>
+          />
         </div>
       </div>
 
-      {/* Campo de estrellas: canvas (suave, anti-aliased, twinkle por estrella) */}
+      {/* Campo de estrellas: canvas a 30fps */}
       {mounted && (
         <canvas
           ref={canvasRef}
@@ -360,10 +292,10 @@ export function CosmicBackground() {
           <div key={i} className="shooting-star" style={s} />
         ))}
 
-      {/* Grano fino: evita el banding de los degradados */}
+      {/* Grano fino */}
       <div className="cosmic-grain absolute inset-0" />
 
-      {/* Vineta para mantener legible el contenido */}
+      {/* Vineta */}
       <div
         className="absolute inset-0"
         style={{
