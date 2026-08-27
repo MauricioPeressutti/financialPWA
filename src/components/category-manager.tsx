@@ -20,9 +20,11 @@ type Cat = { id: string; name: string; archived: boolean; subcategories: Sub[] }
 export function CategoryManager({
   categories,
   canEdit,
+  kind = "expense",
 }: {
   categories: Cat[];
   canEdit: boolean;
+  kind?: "expense" | "income";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -45,7 +47,7 @@ export function CategoryManager({
       {canEdit && (
         <div className="flex gap-2">
           <Input
-            placeholder="Nueva categoría"
+            placeholder={kind === "income" ? "Nueva fuente" : "Nueva categoría"}
             value={newCat}
             onChange={(e) => setNewCat(e.target.value)}
           />
@@ -53,7 +55,7 @@ export function CategoryManager({
             disabled={pending || !newCat.trim()}
             onClick={() =>
               run(async () => {
-                const r = await createCategory({ name: newCat });
+                const r = await createCategory({ name: newCat, kind });
                 if (r.ok) setNewCat("");
                 return r;
               })

@@ -15,8 +15,13 @@ export async function createCategory(raw: unknown): Promise<ActionResult> {
   const parsed = categoryInput.safeParse(raw);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
 
-  await db.insert(categories).values({ teamId: team.id, name: parsed.data.name.trim() });
+  await db.insert(categories).values({
+    teamId: team.id,
+    name: parsed.data.name.trim(),
+    kind: parsed.data.kind,
+  });
   revalidatePath("/categories");
+  revalidatePath("/movimientos");
   return { ok: true };
 }
 

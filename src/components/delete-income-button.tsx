@@ -15,22 +15,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { deleteExpense } from "@/lib/actions/expenses";
+import { deleteIncome } from "@/lib/actions/incomes";
 
-export function DeleteExpenseButton({ id }: { id: string }) {
+export function DeleteIncomeButton({ id }: { id: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function confirm() {
     startTransition(async () => {
-      const res = await deleteExpense(id);
+      const res = await deleteIncome(id);
       if (!res.ok) {
         toast.error(res.error);
         return;
       }
-      toast.success("Gasto eliminado");
-      router.push("/movimientos");
+      toast.success("Ingreso eliminado");
+      router.push("/movimientos/ingresos");
       router.refresh();
     });
   }
@@ -40,16 +40,14 @@ export function DeleteExpenseButton({ id }: { id: string }) {
       <DialogTrigger
         render={
           <Button variant="destructive" className="w-full">
-            Eliminar gasto
+            Eliminar ingreso
           </Button>
         }
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>¿Eliminar este gasto?</DialogTitle>
-          <DialogDescription>
-            Se borran también sus reintegros. No se puede deshacer.
-          </DialogDescription>
+          <DialogTitle>¿Eliminar este ingreso?</DialogTitle>
+          <DialogDescription>No se puede deshacer.</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose render={<Button variant="outline">Cancelar</Button>} />

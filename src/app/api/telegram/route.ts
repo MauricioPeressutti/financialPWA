@@ -4,11 +4,13 @@ import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import {
   expenses,
+  incomes,
   reimbursements,
   teamMembers,
   telegramLinks,
 } from "@/db/schema";
 import { insertExpense } from "@/lib/expenses-core";
+import { insertIncome } from "@/lib/income-core";
 import { parseExpenseMessage } from "@/lib/gemini";
 import { formatCents } from "@/lib/money";
 import {
@@ -16,6 +18,11 @@ import {
   paymentMethodMeta,
   type PaymentMethod,
 } from "@/lib/payment-methods";
+import {
+  INCOME_METHODS,
+  incomeMethodMeta,
+  type IncomeMethod,
+} from "@/lib/income-methods";
 import { getActiveCategories } from "@/lib/queries";
 import {
   answerCallbackQuery,
@@ -31,10 +38,12 @@ const OK = () => new Response("ok");
 const HELP = [
   "👋 <b>Finanzas</b>",
   "",
-  "Escribí un gasto en lenguaje normal y lo cargo:",
+  "Escribí un gasto o un ingreso en lenguaje normal y lo cargo:",
   "· <i>5300 chino con débito</i>",
   "· <i>nafta 20 mil, tarjeta de crédito</i>",
   "· <i>super 8500 con mercado pago, me devolvieron 500</i>",
+  "· <i>cobré el sueldo 900 mil por transferencia</i>",
+  "· <i>vendí una torta, entraron 15000 en efectivo</i>",
   "",
   "Después de cargar te dejo un botón para borrarlo si me equivoqué.",
 ].join("\n");
@@ -60,6 +69,16 @@ const norm = (s: string) =>
     })
     .join("")
     .trim();
+
+type Cat = Awaited<ReturnType<typeof getActiveCategories>>[number];
+
+function resolveCategory(cats: Cat[], name: string) {
+  let cat = cats.find((c) => norm(c.name) === norm(name));
+  if (!cat && name)
+    cat = cats.find((c) => norm(c.name).includes(norm(name)));
+  if (!cat) cat = cats.find((c) => norm(c.name) === "otros") ?? cats[0];
+  return cat ?? null;
+}
 
 async function linkedUser(telegramUserId: number) {
   const [row] = await db
@@ -135,10 +154,7 @@ export async function POST(req: Request) {
           linkedAt: new Date(),
         })
         .where(eq(telegramLinks.id, link.id));
-      await sendMessage(
-        chatId,
-        "✅ <b>Cuenta vinculada.</b>\n\n" + HELP,
-      );
+      await sendMessage(chatId, "✅ <b>Cuenta vinculada.</b>\n\n" + HELP);
       return OK();
     }
 
@@ -147,7 +163,7 @@ export async function POST(req: Request) {
       return OK();
     }
 
-    // ── mensaje = gasto ──────────────────────────────────
+    // ── mensaje = movimiento ─────────────────────────────
     const link = await linkedUser(msg.from.id);
     if (!link) {
       await sendMessage(
@@ -163,48 +179,104 @@ export async function POST(req: Request) {
       return OK();
     }
 
-    const cats = await getActiveCategories(teamId);
-    const parsed = await parseExpenseMessage(text, {
-      categories: cats.map((c) => ({
+    const [expCats, incCats] = await Promise.all([
+      getActiveCategories(teamId, "expense"),
+      getActiveCategories(teamId, "income"),
+    ]);
+
+    const toTree = (cs: Cat[]) =>
+      cs.map((c) => ({
         name: c.name,
         subcategories: c.subcategories.map((s) => ({ name: s.name })),
-      })),
+      }));
+
+    const parsed = await parseExpenseMessage(text, {
+      expenseCategories: toTree(expCats),
+      incomeCategories: toTree(incCats),
       today: today(),
     });
 
     if (!parsed || parsed.amount === null || parsed.amount <= 0) {
       await sendMessage(
         chatId,
-        "No pude sacar el monto. Probá algo como <i>“5000 super débito”</i>.",
+        "No pude sacar el monto. Probá algo como <i>“5000 super débito”</i> o <i>“cobré 30000 por transferencia”</i>.",
       );
       return OK();
     }
 
-    // resolver categoría
-    let cat = cats.find((c) => norm(c.name) === norm(parsed.category));
-    if (!cat && parsed.category)
-      cat = cats.find((c) => norm(c.name).includes(norm(parsed.category)));
-    if (!cat) cat = cats.find((c) => norm(c.name) === "otros") ?? cats[0];
+    const amountCents = Math.round(parsed.amount * 100);
+    const on = /^\d{4}-\d{2}-\d{2}$/.test(parsed.spentOn)
+      ? parsed.spentOn
+      : today();
+    const conf = parsed.confidence === "alta" ? "✅" : "⚠️";
+    const dateLine = on !== today() ? `📅 ${on}` : "";
+
+    if (parsed.kind === "ingreso") {
+      const cat = resolveCategory(incCats, parsed.category);
+      if (!cat) {
+        await sendMessage(
+          chatId,
+          "No tenés fuentes de ingreso cargadas. Creá alguna en la app (Categorías → Ingresos).",
+        );
+        return OK();
+      }
+      const sub =
+        cat.subcategories.find((s) => norm(s.name) === norm(parsed.subcategory)) ??
+        null;
+      const method: IncomeMethod = (
+        INCOME_METHODS as readonly string[]
+      ).includes(parsed.paymentMethod)
+        ? (parsed.paymentMethod as IncomeMethod)
+        : "transferencia";
+
+      const { id } = await insertIncome(teamId, link.userId, {
+        amountCents,
+        categoryId: cat.id,
+        subcategoryId: sub?.id ?? null,
+        method,
+        description: parsed.description || null,
+        receivedOn: on,
+      });
+
+      revalidatePath("/");
+      revalidatePath("/movimientos");
+      revalidatePath("/analytics");
+
+      const lines = [
+        `${conf} 💰 <b>+${formatCents(amountCents)}</b> · ${cat.name}${
+          sub ? ` · ${sub.name}` : ""
+        } · ${incomeMethodMeta[method].label}`,
+      ];
+      if (parsed.description) lines.push(`<i>${parsed.description}</i>`);
+      if (dateLine) lines.push(dateLine);
+      if (parsed.confidence !== "alta" && parsed.note)
+        lines.push(`\n<i>${parsed.note}</i>`);
+
+      await sendMessage(chatId, lines.join("\n"), [
+        [{ text: "🗑️ Borrar", callback_data: `dinc:${id}` }],
+      ]);
+      return OK();
+    }
+
+    // gasto
+    const cat = resolveCategory(expCats, parsed.category);
     if (!cat) {
-      await sendMessage(chatId, "El equipo no tiene categorías. Creá alguna en la app.");
+      await sendMessage(
+        chatId,
+        "El equipo no tiene categorías. Creá alguna en la app.",
+      );
       return OK();
     }
     const sub =
       cat.subcategories.find((s) => norm(s.name) === norm(parsed.subcategory)) ??
       null;
-
     const method: PaymentMethod = (
       PAYMENT_METHODS as readonly string[]
     ).includes(parsed.paymentMethod)
       ? (parsed.paymentMethod as PaymentMethod)
       : "efectivo";
-
-    const amountCents = Math.round(parsed.amount * 100);
     const reimbursedCents =
       parsed.reimbursed > 0 ? Math.round(parsed.reimbursed * 100) : null;
-    const spentOn = /^\d{4}-\d{2}-\d{2}$/.test(parsed.spentOn)
-      ? parsed.spentOn
-      : today();
 
     const { id } = await insertExpense(teamId, link.userId, {
       amountCents,
@@ -212,25 +284,23 @@ export async function POST(req: Request) {
       subcategoryId: sub?.id ?? null,
       paymentMethod: method,
       description: parsed.description || null,
-      spentOn,
+      spentOn: on,
       reimbursedCents,
     });
 
     revalidatePath("/");
-    revalidatePath("/expenses");
+    revalidatePath("/movimientos");
     revalidatePath("/analytics");
 
     const lines = [
-      `${parsed.confidence === "alta" ? "✅" : "⚠️"} <b>${formatCents(
-        amountCents,
-      )}</b> · ${cat.name}${sub ? ` · ${sub.name}` : ""} · ${
-        paymentMethodMeta[method].label
-      }`,
+      `${conf} <b>${formatCents(amountCents)}</b> · ${cat.name}${
+        sub ? ` · ${sub.name}` : ""
+      } · ${paymentMethodMeta[method].label}`,
     ];
     if (reimbursedCents)
       lines.push(`↩️ reintegro ${formatCents(reimbursedCents)}`);
     if (parsed.description) lines.push(`<i>${parsed.description}</i>`);
-    if (spentOn !== today()) lines.push(`📅 ${spentOn}`);
+    if (dateLine) lines.push(dateLine);
     if (parsed.confidence !== "alta" && parsed.note)
       lines.push(`\n<i>${parsed.note}</i>`);
 
@@ -261,33 +331,55 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
   const data = cq.data ?? "";
   const chatId = cq.message?.chat.id;
   const messageId = cq.message?.message_id;
+  if (!chatId || !messageId) {
+    await answerCallbackQuery(cq.id);
+    return;
+  }
 
-  if (data.startsWith("del:") && chatId && messageId) {
-    const expenseId = data.slice(4);
-    const link = await linkedUser(cq.from.id);
-    if (!link) {
-      await answerCallbackQuery(cq.id, "No estás vinculado.");
-      return;
-    }
-    const teamId = await teamOf(link.userId);
+  const isIncome = data.startsWith("dinc:");
+  const isExpense = data.startsWith("del:");
+  if (!isIncome && !isExpense) {
+    await answerCallbackQuery(cq.id);
+    return;
+  }
+
+  const id = data.slice(data.indexOf(":") + 1);
+  const link = await linkedUser(cq.from.id);
+  if (!link) {
+    await answerCallbackQuery(cq.id, "No estás vinculado.");
+    return;
+  }
+  const teamId = (await teamOf(link.userId)) ?? "";
+
+  if (isIncome) {
     const del = await db
-      .delete(expenses)
-      .where(
-        and(eq(expenses.id, expenseId), eq(expenses.teamId, teamId ?? "")),
-      )
-      .returning({ id: expenses.id });
+      .delete(incomes)
+      .where(and(eq(incomes.id, id), eq(incomes.teamId, teamId)))
+      .returning({ id: incomes.id });
     if (del.length) {
-      await db
-        .delete(reimbursements)
-        .where(eq(reimbursements.expenseId, expenseId));
       revalidatePath("/");
-      revalidatePath("/expenses");
-      await editMessageText(chatId, messageId, "🗑️ <s>Gasto borrado.</s>");
+      revalidatePath("/movimientos");
+      revalidatePath("/analytics");
+      await editMessageText(chatId, messageId, "🗑️ <s>Ingreso borrado.</s>");
       await answerCallbackQuery(cq.id, "Borrado");
     } else {
-      await answerCallbackQuery(cq.id, "Ese gasto ya no está.");
+      await answerCallbackQuery(cq.id, "Ese ingreso ya no está.");
     }
     return;
   }
-  await answerCallbackQuery(cq.id);
+
+  const del = await db
+    .delete(expenses)
+    .where(and(eq(expenses.id, id), eq(expenses.teamId, teamId)))
+    .returning({ id: expenses.id });
+  if (del.length) {
+    await db.delete(reimbursements).where(eq(reimbursements.expenseId, id));
+    revalidatePath("/");
+    revalidatePath("/movimientos");
+    revalidatePath("/analytics");
+    await editMessageText(chatId, messageId, "🗑️ <s>Gasto borrado.</s>");
+    await answerCallbackQuery(cq.id, "Borrado");
+  } else {
+    await answerCallbackQuery(cq.id, "Ese gasto ya no está.");
+  }
 }

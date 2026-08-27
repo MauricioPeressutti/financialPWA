@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
 import {
   Home,
-  ListPlus,
+  ArrowLeftRight,
   ChartColumn,
   Tags,
   Users,
@@ -36,7 +36,12 @@ type Props = {
 };
 
 const NAV = [
-  { href: "/expenses", label: "Gastos", icon: ListPlus },
+  {
+    href: "/movimientos",
+    label: "Movimientos",
+    icon: ArrowLeftRight,
+    match: ["/movimientos", "/expenses", "/incomes"],
+  },
   { href: "/analytics", label: "Análisis", icon: ChartColumn },
   { href: "/", label: "Inicio", icon: Home },
   { href: "/categories", label: "Categorías", icon: Tags },
@@ -121,8 +126,11 @@ export function AppShell({ user, team, teams, children }: Props) {
       </main>
 
       <nav className="cosmic-panel fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-lg justify-around border-t pb-[env(safe-area-inset-bottom)]">
-        {NAV.map(({ href, label, icon: Icon }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+        {NAV.map(({ href, label, icon: Icon, match }) => {
+          const active =
+            href === "/"
+              ? pathname === "/"
+              : (match ?? [href]).some((p) => pathname.startsWith(p));
           return (
             <Link
               key={href}

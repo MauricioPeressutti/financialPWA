@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
+import { INCOME_METHODS } from "@/lib/income-methods";
 
 export const expenseInput = z.object({
   amount: z.string().min(1, "Ingresá un monto"),
@@ -22,8 +23,19 @@ export const reimbursementInput = z.object({
   note: z.string().max(280).optional().or(z.literal("")),
 });
 
+export const incomeInput = z.object({
+  amount: z.string().min(1, "Ingresá un monto"),
+  receivedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
+  categoryId: z.string().uuid("Elegí una fuente"),
+  subcategoryId: z.string().uuid().optional().or(z.literal("")),
+  method: z.enum(INCOME_METHODS),
+  description: z.string().max(280).optional().or(z.literal("")),
+});
+export type IncomeInput = z.infer<typeof incomeInput>;
+
 export const categoryInput = z.object({
   name: z.string().min(1, "Nombre requerido").max(60),
+  kind: z.enum(["expense", "income"]).default("expense"),
 });
 
 export const subcategoryInput = z.object({

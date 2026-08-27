@@ -6,6 +6,7 @@ import { db } from "@/db";
 import {
   categories,
   expenses,
+  incomes,
   reimbursements,
   subcategories,
   teamInvitations,
@@ -14,7 +15,9 @@ import {
   telegramLinks,
   users,
 } from "@/db/schema";
+import type { CategoryKind } from "@/db/schema";
 import type { PaymentMethod } from "@/lib/payment-methods";
+import type { IncomeMethod } from "@/lib/income-methods";
 
 /** Rango [primer día, último día] del mes YYYY-MM como strings de fecha. */
 export function monthRange(month: string) {
@@ -29,11 +32,20 @@ export function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
-export async function getActiveCategories(teamId: string) {
+export async function getActiveCategories(
+  teamId: string,
+  kind: CategoryKind = "expense",
+) {
   const cats = await db
     .select()
     .from(categories)
-    .where(and(eq(categories.teamId, teamId), eq(categories.archived, false)))
+    .where(
+      and(
+        eq(categories.teamId, teamId),
+        eq(categories.archived, false),
+        eq(categories.kind, kind),
+      ),
+    )
     .orderBy(categories.name);
   const subs = await db
     .select()
@@ -140,6 +152,69 @@ export async function getExpense(teamId: string, id: string) {
   return { ...expense, reimbursements: refunds };
 }
 
+export type IncomeFilters = {
+  month?: string;
+  from?: string;
+  to?: string;
+  categoryId?: string;
+  method?: IncomeMethod;
+};
+
+export async function listIncomes(teamId: string, filters: IncomeFilters = {}) {
+  const conds = [eq(incomes.teamId, teamId)];
+
+  if (filters.month) {
+    const { start, end } = monthRange(filters.month);
+    conds.push(gte(incomes.receivedOn, start), lte(incomes.receivedOn, end));
+  }
+  if (filters.from) conds.push(gte(incomes.receivedOn, filters.from));
+  if (filters.to) conds.push(lte(incomes.receivedOn, filters.to));
+  if (filters.categoryId) conds.push(eq(incomes.categoryId, filters.categoryId));
+  if (filters.method) conds.push(eq(incomes.method, filters.method));
+
+  return db
+    .select({
+      id: incomes.id,
+      amountCents: incomes.amountCents,
+      method: incomes.method,
+      description: incomes.description,
+      receivedOn: incomes.receivedOn,
+      categoryName: categories.name,
+      subcategoryName: subcategories.name,
+      createdBy: users.displayName,
+    })
+    .from(incomes)
+    .innerJoin(categories, eq(categories.id, incomes.categoryId))
+    .leftJoin(subcategories, eq(subcategories.id, incomes.subcategoryId))
+    .innerJoin(users, eq(users.id, incomes.createdByUserId))
+    .where(and(...conds))
+    .orderBy(desc(incomes.receivedOn), desc(incomes.createdAt));
+}
+
+export async function getIncome(teamId: string, id: string) {
+  const [income] = await db
+    .select({
+      id: incomes.id,
+      amountCents: incomes.amountCents,
+      method: incomes.method,
+      description: incomes.description,
+      receivedOn: incomes.receivedOn,
+      categoryId: incomes.categoryId,
+      subcategoryId: incomes.subcategoryId,
+      categoryName: categories.name,
+      subcategoryName: subcategories.name,
+      createdBy: users.displayName,
+    })
+    .from(incomes)
+    .innerJoin(categories, eq(categories.id, incomes.categoryId))
+    .leftJoin(subcategories, eq(subcategories.id, incomes.subcategoryId))
+    .innerJoin(users, eq(users.id, incomes.createdByUserId))
+    .where(and(eq(incomes.id, id), eq(incomes.teamId, teamId)))
+    .limit(1);
+
+  return income ?? null;
+}
+
 export async function getMonthlyDashboard(teamId: string, month: string) {
   const { start, end } = monthRange(month);
   const inMonth = and(
@@ -191,14 +266,54 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
       ),
     );
 
+  const inMonthInc = and(
+    eq(incomes.teamId, teamId),
+    gte(incomes.receivedOn, start),
+    lte(incomes.receivedOn, end),
+  );
+
+  const [incTotals] = await db
+    .select({
+      totalCents: sql<number>`coalesce(sum(${incomes.amountCents}), 0)`,
+      count: sql<number>`count(*)`,
+    })
+    .from(incomes)
+    .where(inMonthInc);
+
+  const incByCategory = await db
+    .select({
+      categoryId: categories.id,
+      categoryName: categories.name,
+      totalCents: sql<number>`sum(${incomes.amountCents})`,
+      count: sql<number>`count(*)`,
+    })
+    .from(incomes)
+    .innerJoin(categories, eq(categories.id, incomes.categoryId))
+    .where(inMonthInc)
+    .groupBy(categories.id, categories.name)
+    .orderBy(sql`sum(${incomes.amountCents}) desc`);
+
+  const grossCents = Number(totals?.totalCents ?? 0);
+  const reimbursedCents = Number(refunds?.totalCents ?? 0);
+  const netCents = grossCents - reimbursedCents;
+  const incomeCents = Number(incTotals?.totalCents ?? 0);
+
   return {
     month,
-    grossCents: Number(totals?.totalCents ?? 0),
-    reimbursedCents: Number(refunds?.totalCents ?? 0),
-    netCents: Number(totals?.totalCents ?? 0) - Number(refunds?.totalCents ?? 0),
+    grossCents,
+    reimbursedCents,
+    netCents,
+    incomeCents,
+    balanceCents: incomeCents - netCents,
     count: Number(totals?.count ?? 0),
+    incomeCount: Number(incTotals?.count ?? 0),
     byCategory: byCategory.map((r) => ({ ...r, totalCents: Number(r.totalCents) })),
     byMethod: byMethod.map((r) => ({ ...r, totalCents: Number(r.totalCents) })),
+    incomeByCategory: incByCategory.map((r) => ({
+      ...r,
+      totalCents: Number(r.totalCents),
+      count: Number(r.count),
+    })),
   };
 }
 

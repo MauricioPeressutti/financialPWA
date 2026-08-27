@@ -3,33 +3,29 @@ import Link from "next/link";
 import { AnalyticsRange } from "@/components/analytics-range";
 import { AnalyticsMember } from "@/components/analytics-member";
 import { AnalyticsTabs } from "@/components/analytics-tabs";
-import { BarRow, WeekdayBars } from "@/components/analytics-bits";
+import { BarRow } from "@/components/analytics-bits";
 import { TrendChart } from "@/components/trend-chart";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireTeam } from "@/lib/auth";
+import { resolveRange, type AnalyticsRange as Range } from "@/lib/analytics-range";
 import {
-  getAnalytics,
-  getMonthlyTrend,
-  resolveRange,
-  type AnalyticsRange as Range,
-} from "@/lib/analytics";
+  getIncomeAnalytics,
+  getMonthlyIncomeTrend,
+} from "@/lib/analytics-income";
 import { formatCents } from "@/lib/money";
-import { PaymentMethodTag, paymentMethodLabels } from "@/lib/payment-methods";
+import { IncomeMethodTag, incomeMethodLabels } from "@/lib/income-methods";
 import { getTeamMembers } from "@/lib/queries";
 
 const RANGES: Range[] = ["1m", "3m", "6m", "1y", "all"];
+const GREEN = "#10b981";
 
-function Kpi({ label, value, tone }: { label: string; value: string; tone?: "pos" | "neg" }) {
+function Kpi({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border bg-card/40 p-3">
       <p className="text-[0.68rem] uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p
-        className={`mt-0.5 text-base font-semibold tabular-nums ${
-          tone === "pos" ? "text-emerald-500" : ""
-        }`}
-      >
+      <p className="mt-0.5 text-base font-semibold tabular-nums text-emerald-500">
         {value}
       </p>
     </div>
@@ -56,9 +52,9 @@ function Section({
   );
 }
 
-export default async function AnalyticsPage({
+export default async function IncomeAnalyticsPage({
   searchParams,
-}: PageProps<"/analytics">) {
+}: PageProps<"/analytics/ingresos">) {
   const { team } = await requireTeam();
   const sp = await searchParams;
   const range: Range =
@@ -69,14 +65,13 @@ export default async function AnalyticsPage({
 
   const members = await getTeamMembers(team.id);
   const memberId =
-    typeof sp.member === "string" &&
-    members.some((m) => m.userId === sp.member)
+    typeof sp.member === "string" && members.some((m) => m.userId === sp.member)
       ? sp.member
       : undefined;
 
   const [a, trend] = await Promise.all([
-    getAnalytics(team.id, from, to, memberId),
-    getMonthlyTrend(team.id, 12, memberId),
+    getIncomeAnalytics(team.id, from, to, memberId),
+    getMonthlyIncomeTrend(team.id, 12, memberId),
   ]);
 
   const empty = a.kpis.count === 0;
@@ -100,29 +95,19 @@ export default async function AnalyticsPage({
 
       {empty ? (
         <p className="py-10 text-center text-sm text-muted-foreground">
-          No hay gastos en este período.
+          No hay ingresos en este período.
         </p>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <Kpi label="Gastado" value={formatCents(a.kpis.grossCents)} />
-            <Kpi
-              label="Reintegros"
-              value={formatCents(a.kpis.reimbursedCents)}
-              tone="pos"
-            />
-            <Kpi label="Neto" value={formatCents(a.kpis.netCents)} />
+            <Kpi label="Total" value={formatCents(a.kpis.totalCents)} />
             <Kpi label="Prom. por día" value={formatCents(a.kpis.avgPerDayCents)} />
-            <Kpi label="Gastos" value={String(a.kpis.count)} />
-            <Kpi label="Ticket promedio" value={formatCents(a.kpis.avgTicketCents)} />
-            <Kpi label="Gasto más grande" value={formatCents(a.kpis.maxExpenseCents)} />
-            <Kpi
-              label="Recupero"
-              value={`${a.kpis.refundRatePct.toFixed(0)}%`}
-            />
+            <Kpi label="Ingresos" value={String(a.kpis.count)} />
+            <Kpi label="Promedio" value={formatCents(a.kpis.avgCents)} />
+            <Kpi label="Más grande" value={formatCents(a.kpis.maxCents)} />
           </div>
 
-          <Section title="Tendencia mensual" hint="neto · últimos 12 meses">
+          <Section title="Tendencia mensual" hint="últimos 12 meses">
             <Card>
               <CardContent className="pt-2">
                 <TrendChart data={trend} />
@@ -130,31 +115,33 @@ export default async function AnalyticsPage({
             </Card>
           </Section>
 
-          <Section title="En qué se va" hint="por categoría">
+          <Section title="Por fuente">
             <div className="divide-y">
-              {a.byCategory.map((c) => (
+              {a.bySource.map((c) => (
                 <BarRow
                   key={c.name}
                   label={c.name}
-                  valueCents={c.grossCents}
+                  valueCents={c.totalCents}
                   pct={c.pct}
                   meta={`${c.count}`}
+                  fill={GREEN}
                 />
               ))}
             </div>
           </Section>
 
           {a.bySubcategory.length > 0 && (
-            <Section title="Detalle por subcategoría" hint="top 8">
+            <Section title="Detalle" hint="top 8">
               <div className="divide-y">
                 {a.bySubcategory.map((s) => (
                   <BarRow
                     key={`${s.categoryName}-${s.name}`}
                     label={s.name}
                     sublabel={s.categoryName}
-                    valueCents={s.grossCents}
+                    valueCents={s.totalCents}
                     pct={s.pct}
                     meta={`${s.count}`}
+                    fill={GREEN}
                   />
                 ))}
               </div>
@@ -162,49 +149,43 @@ export default async function AnalyticsPage({
           )}
 
           {!memberId && a.byMember.length > 1 && (
-          <Section title="Quién gastó más">
-            <div className="divide-y">
-              {a.byMember.map((m) => (
-                <BarRow
-                  key={m.name}
-                  label={m.name}
-                  valueCents={m.grossCents}
-                  pct={m.pct}
-                  meta={`${m.count} · ${formatCents(m.avgTicketCents)}/gasto`}
-                />
-              ))}
-            </div>
-          </Section>
+            <Section title="Quién ingresó más">
+              <div className="divide-y">
+                {a.byMember.map((m) => (
+                  <BarRow
+                    key={m.name}
+                    label={m.name}
+                    valueCents={m.totalCents}
+                    pct={m.pct}
+                    meta={`${m.count} · ${formatCents(m.avgCents)}/mov`}
+                    fill={GREEN}
+                  />
+                ))}
+              </div>
+            </Section>
           )}
 
-          <Section title="Formas de pago">
+          <Section title="Medios de cobro">
             <div className="divide-y">
-              {a.byPaymentMethod.map((p) => (
+              {a.byMethod.map((p) => (
                 <BarRow
                   key={p.method}
-                  label={paymentMethodLabels[p.method] ?? p.method}
-                  valueCents={p.grossCents}
+                  label={incomeMethodLabels[p.method] ?? p.method}
+                  valueCents={p.totalCents}
                   pct={p.pct}
                   meta={`${p.count}`}
+                  fill={GREEN}
                 />
               ))}
             </div>
           </Section>
 
-          <Section title="Por día de la semana" hint="total gastado">
-            <Card>
-              <CardContent className="pt-4">
-                <WeekdayBars data={a.byWeekday} />
-              </CardContent>
-            </Card>
-          </Section>
-
-          <Section title="Gastos más grandes" hint="top 10">
+          <Section title="Ingresos más grandes" hint="top 10">
             <div className="divide-y">
-              {a.topExpenses.map((e) => (
+              {a.topIncomes.map((e) => (
                 <Link
                   key={e.id}
-                  href={`/expenses/${e.id}`}
+                  href={`/incomes/${e.id}`}
                   className="flex items-center justify-between gap-3 py-2 text-sm"
                 >
                   <div className="min-w-0">
@@ -214,22 +195,15 @@ export default async function AnalyticsPage({
                     </p>
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
                       <span>
-                        {e.spentOn}
+                        {e.receivedOn}
                         {e.createdBy ? ` · ${e.createdBy}` : ""} ·
                       </span>
-                      <PaymentMethodTag method={e.paymentMethod} />
+                      <IncomeMethodTag method={e.method} />
                     </p>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <p className="font-medium tabular-nums">
-                      {formatCents(e.amountCents)}
-                    </p>
-                    {e.netCents !== e.amountCents && (
-                      <p className="text-xs text-emerald-500 tabular-nums">
-                        neto {formatCents(e.netCents)}
-                      </p>
-                    )}
-                  </div>
+                  <p className="shrink-0 font-medium tabular-nums text-emerald-500">
+                    {formatCents(e.amountCents)}
+                  </p>
                 </Link>
               ))}
             </div>

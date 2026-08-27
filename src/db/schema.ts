@@ -21,6 +21,16 @@ export const paymentMethod = pgEnum("payment_method", [
   "mercadopago",
 ]);
 
+export const incomeMethod = pgEnum("income_method", [
+  "efectivo",
+  "transferencia",
+  "mercadopago",
+  "cheque",
+  "otro",
+]);
+
+export const categoryKind = pgEnum("category_kind", ["expense", "income"]);
+
 export const memberRole = pgEnum("member_role", ["owner", "member"]);
 
 export const invitationStatus = pgEnum("invitation_status", [
@@ -101,6 +111,7 @@ export const categories = pgTable("categories", {
     .notNull()
     .references(() => teams.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
+  kind: categoryKind("kind").notNull().default("expense"),
   archived: boolean("archived").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -147,6 +158,35 @@ export const expenses = pgTable(
   ],
 );
 
+// ─── Ingresos ──────────────────────────────────────────
+export const incomes = pgTable(
+  "incomes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    amountCents: integer("amount_cents").notNull(),
+    currency: text("currency").notNull().default("ARS"),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id),
+    subcategoryId: uuid("subcategory_id").references(() => subcategories.id),
+    method: incomeMethod("method").notNull().default("transferencia"),
+    description: text("description"),
+    receivedOn: date("received_on").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("incomes_team_received_idx").on(t.teamId, t.receivedOn),
+    index("incomes_team_category_idx").on(t.teamId, t.categoryId),
+  ],
+);
+
 // ─── Reintegros ────────────────────────────────────────
 export const reimbursements = pgTable(
   "reimbursements",
@@ -172,5 +212,8 @@ export type Team = typeof teams.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Subcategory = typeof subcategories.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
+export type Income = typeof incomes.$inferSelect;
 export type Reimbursement = typeof reimbursements.$inferSelect;
 export type PaymentMethod = (typeof paymentMethod.enumValues)[number];
+export type IncomeMethod = (typeof incomeMethod.enumValues)[number];
+export type CategoryKind = (typeof categoryKind.enumValues)[number];

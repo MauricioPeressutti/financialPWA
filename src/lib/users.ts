@@ -15,6 +15,14 @@ const DEFAULT_CATEGORIES: Record<string, string[]> = {
   Otros: [],
 };
 
+const DEFAULT_INCOME_CATEGORIES: Record<string, string[]> = {
+  Sueldo: [],
+  Ventas: [],
+  Freelance: [],
+  Extras: ["Regalo", "Reintegro", "Intereses"],
+  Otros: [],
+};
+
 /** Crea o actualiza el usuario a partir del token de Firebase. */
 export async function upsertUserFromToken(token: FirebaseToken) {
   const values = {
@@ -53,17 +61,25 @@ export async function ensureTeam(userId: string) {
 
   await db.insert(teamMembers).values({ teamId: team.id, userId, role: "owner" });
 
-  for (const [catName, subs] of Object.entries(DEFAULT_CATEGORIES)) {
-    const [cat] = await db
-      .insert(categories)
-      .values({ teamId: team.id, name: catName })
-      .returning();
-    if (subs.length > 0) {
-      await db
-        .insert(subcategories)
-        .values(subs.map((name) => ({ teamId: team.id, categoryId: cat.id, name })));
+  const seed = async (
+    tree: Record<string, string[]>,
+    kind: "expense" | "income",
+  ) => {
+    for (const [catName, subs] of Object.entries(tree)) {
+      const [cat] = await db
+        .insert(categories)
+        .values({ teamId: team.id, name: catName, kind })
+        .returning();
+      if (subs.length > 0) {
+        await db
+          .insert(subcategories)
+          .values(subs.map((name) => ({ teamId: team.id, categoryId: cat.id, name })));
+      }
     }
-  }
+  };
+
+  await seed(DEFAULT_CATEGORIES, "expense");
+  await seed(DEFAULT_INCOME_CATEGORIES, "income");
 
   return team.id;
 }
