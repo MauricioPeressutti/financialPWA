@@ -242,7 +242,15 @@ export async function POST(req: Request) {
     try {
       const chat =
         update.message?.chat.id ?? update.callback_query?.message?.chat.id;
-      if (chat) await sendMessage(chat, "Uf, algo falló procesando eso. Probá de nuevo.");
+      const detail =
+        process.env.TELEGRAM_DEBUG === "1"
+          ? `\n\n<code>${String(err instanceof Error ? err.message : err).slice(0, 400)}</code>`
+          : "";
+      if (chat)
+        await sendMessage(
+          chat,
+          "Uf, algo falló procesando eso. Probá de nuevo." + detail,
+        );
     } catch {}
   }
 
