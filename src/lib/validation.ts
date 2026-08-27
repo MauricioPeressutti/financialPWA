@@ -7,6 +7,9 @@ export const expenseInput = z.object({
   subcategoryId: z.string().uuid().optional().or(z.literal("")),
   paymentMethod: z.enum(["efectivo", "debito", "credito"]),
   description: z.string().max(280).optional().or(z.literal("")),
+  // Reintegro inmediato opcional (ej: MODO devuelve al toque). Se anota
+  // como reintegro del mismo gasto, con la fecha del gasto.
+  reimbursedAmount: z.string().optional().or(z.literal("")),
 });
 export type ExpenseInput = z.infer<typeof expenseInput>;
 

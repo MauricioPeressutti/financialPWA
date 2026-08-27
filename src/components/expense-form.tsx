@@ -51,6 +51,7 @@ export function ExpenseForm({ categories, expense }: Props) {
       subcategoryId: expense?.subcategoryId ?? "",
       paymentMethod: expense?.paymentMethod ?? "efectivo",
       description: expense?.description ?? "",
+      reimbursedAmount: "",
     },
   });
 
@@ -59,6 +60,20 @@ export function ExpenseForm({ categories, expense }: Props) {
     () => categories.find((c) => c.id === categoryId)?.subcategories ?? [],
     [categories, categoryId],
   );
+
+  const categoryItems = useMemo(
+    () => Object.fromEntries(categories.map((c) => [c.id, c.name])),
+    [categories],
+  );
+  const subItems = useMemo(
+    () => Object.fromEntries(subs.map((s) => [s.id, s.name])),
+    [subs],
+  );
+  const paymentItems = {
+    efectivo: "Efectivo",
+    debito: "Débito",
+    credito: "Crédito",
+  };
 
   async function onSubmit(values: ExpenseInput) {
     const res = expense
@@ -100,6 +115,7 @@ export function ExpenseForm({ categories, expense }: Props) {
           name="categoryId"
           render={({ field }) => (
             <Select
+              items={categoryItems}
               value={field.value}
               onValueChange={(v) => {
                 field.onChange(v);
@@ -129,7 +145,11 @@ export function ExpenseForm({ categories, expense }: Props) {
             control={form.control}
             name="subcategoryId"
             render={({ field }) => (
-              <Select value={field.value || ""} onValueChange={field.onChange}>
+              <Select
+                items={subItems}
+                value={field.value || ""}
+                onValueChange={field.onChange}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Sin subcategoría" />
                 </SelectTrigger>
@@ -152,7 +172,11 @@ export function ExpenseForm({ categories, expense }: Props) {
           control={form.control}
           name="paymentMethod"
           render={({ field }) => (
-            <Select value={field.value} onValueChange={field.onChange}>
+            <Select
+              items={paymentItems}
+              value={field.value}
+              onValueChange={field.onChange}
+            >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -170,6 +194,23 @@ export function ExpenseForm({ categories, expense }: Props) {
         <Label htmlFor="description">Descripción (opcional)</Label>
         <Textarea id="description" rows={2} {...form.register("description")} />
       </div>
+
+      {!expense && (
+        <div className="space-y-1.5 rounded-lg border border-dashed p-3">
+          <Label htmlFor="reimbursedAmount">
+            ¿Te reintegraron algo? (opcional)
+          </Label>
+          <Input
+            id="reimbursedAmount"
+            inputMode="decimal"
+            placeholder="Ej: MODO te devolvió al toque"
+            {...form.register("reimbursedAmount")}
+          />
+          <p className="text-xs text-muted-foreground">
+            Se anota como reintegro de este gasto, con la misma fecha.
+          </p>
+        </div>
+      )}
 
       <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
         {form.formState.isSubmitting ? "Guardando…" : expense ? "Guardar cambios" : "Cargar gasto"}

@@ -29,16 +29,33 @@ export async function createExpense(raw: unknown): Promise<ActionResult> {
     if (!sub) return { ok: false, error: "Subcategoría inválida" };
   }
 
-  await db.insert(expenses).values({
-    teamId: team.id,
-    createdByUserId: user.id,
-    amountCents: cents,
-    categoryId: parsed.data.categoryId,
-    subcategoryId: subId,
-    paymentMethod: parsed.data.paymentMethod,
-    description: parsed.data.description || null,
-    spentOn: parsed.data.spentOn,
-  });
+  const [created] = await db
+    .insert(expenses)
+    .values({
+      teamId: team.id,
+      createdByUserId: user.id,
+      amountCents: cents,
+      categoryId: parsed.data.categoryId,
+      subcategoryId: subId,
+      paymentMethod: parsed.data.paymentMethod,
+      description: parsed.data.description || null,
+      spentOn: parsed.data.spentOn,
+    })
+    .returning({ id: expenses.id });
+
+  // Reintegro inmediato (opcional) — mismo día que el gasto.
+  const refundCents = parsed.data.reimbursedAmount
+    ? parseAmountToCents(parsed.data.reimbursedAmount)
+    : null;
+  if (refundCents !== null && refundCents > 0) {
+    await db.insert(reimbursements).values({
+      expenseId: created.id,
+      teamId: team.id,
+      amountCents: refundCents,
+      note: "Reintegro al cargar el gasto",
+      reimbursedOn: parsed.data.spentOn,
+    });
+  }
 
   revalidatePath("/");
   revalidatePath("/expenses");

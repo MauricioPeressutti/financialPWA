@@ -60,6 +60,10 @@ export function ExpenseFilters({
         <div className="space-y-1">
           <Label className="text-xs">Categoría</Label>
           <Select
+            items={{
+              [ALL]: "Todas",
+              ...Object.fromEntries(categories.map((c) => [c.id, c.name])),
+            }}
             value={params.get("categoryId") ?? ALL}
             onValueChange={(v) => set("categoryId", v ?? undefined)}
           >
@@ -79,6 +83,12 @@ export function ExpenseFilters({
         <div className="space-y-1">
           <Label className="text-xs">Forma de pago</Label>
           <Select
+            items={{
+              [ALL]: "Todas",
+              efectivo: "Efectivo",
+              debito: "Débito",
+              credito: "Crédito",
+            }}
             value={params.get("paymentMethod") ?? ALL}
             onValueChange={(v) => set("paymentMethod", v ?? undefined)}
           >
