@@ -3,7 +3,7 @@
   Corre una sola vez por proyecto. Idempotente: se puede repetir sin romper nada.
 
   Uso:
-    ./scripts/setup-gcp.ps1 -ProjectId "mi-proyecto-finanzas"
+    ./scripts/setup-gcp.ps1 -ProjectId "mi-proyecto"
 #>
 param(
   [Parameter(Mandatory = $true)] [string] $ProjectId,
@@ -11,23 +11,32 @@ param(
   [string] $Service = "finanzas"
 )
 
-$ErrorActionPreference = "Stop"
+# gcloud escribe notas informativas a stderr; no las trates como error fatal.
+$ErrorActionPreference = "Continue"
 
-Write-Host "==> Proyecto activo: $ProjectId"
-gcloud config set project $ProjectId
+function Invoke-GcloudStep {
+  param([string] $Label, [string[]] $GcloudArgs)
+  Write-Host "==> $Label"
+  & gcloud @GcloudArgs
+  if ($LASTEXITCODE -ne 0) {
+    throw "Fallo en: gcloud $($GcloudArgs -join ' ') (exit $LASTEXITCODE)"
+  }
+}
 
-Write-Host "==> Habilitando APIs (puede tardar 1-2 min)..."
-gcloud services enable `
-  run.googleapis.com `
-  artifactregistry.googleapis.com `
-  cloudbuild.googleapis.com `
-  sqladmin.googleapis.com `
-  secretmanager.googleapis.com `
-  identitytoolkit.googleapis.com
+Invoke-GcloudStep "Proyecto activo: $ProjectId" @("config", "set", "project", $ProjectId)
 
-Write-Host "==> Region por defecto para Cloud Run: $Region"
-gcloud config set run/region $Region
+Invoke-GcloudStep "Habilitando APIs (puede tardar 1-2 min)" @(
+  "services", "enable",
+  "run.googleapis.com",
+  "artifactregistry.googleapis.com",
+  "cloudbuild.googleapis.com",
+  "sqladmin.googleapis.com",
+  "secretmanager.googleapis.com",
+  "identitytoolkit.googleapis.com"
+)
+
+Invoke-GcloudStep "Region por defecto para Cloud Run: $Region" @("config", "set", "run/region", $Region)
 
 Write-Host ""
-Write-Host "Listo. Ahora podes deployar con:"
+Write-Host "Listo. Ahora deployar con:"
 Write-Host "  ./scripts/deploy.ps1 -ProjectId $ProjectId"
