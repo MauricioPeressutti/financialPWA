@@ -4,8 +4,8 @@ import { NextResponse } from "next/server";
 import {
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_MS,
-  adminAuth,
   createSessionCookie,
+  verifyIdToken,
 } from "@/lib/firebase/admin";
 import { ensureTeam, upsertUserFromToken } from "@/lib/users";
 
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   let decoded;
   try {
-    decoded = await adminAuth.verifyIdToken(idToken);
+    decoded = await verifyIdToken(idToken);
   } catch {
     return NextResponse.json({ error: "Token inválido" }, { status: 401 });
   }
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   const user = await upsertUserFromToken(decoded);
   await ensureTeam(user.id);
 
-  const sessionCookie = await createSessionCookie(idToken);
+  const sessionCookie = await createSessionCookie(decoded);
   const store = await cookies();
   store.set(SESSION_COOKIE_NAME, sessionCookie, {
     httpOnly: true,

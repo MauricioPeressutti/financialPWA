@@ -4,8 +4,7 @@ import type { NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/lib/session";
 
 // Chequeo liviano: sólo presencia de la cookie. La verificación real
-// (firma del token) se hace en los Server Components / route handlers,
-// que corren en Node (firebase-admin no anda en el runtime del proxy).
+// (firma del token) se hace en los Server Components / route handlers.
 const PUBLIC_PATHS = ["/sign-in", "/join"];
 
 export function proxy(request: NextRequest) {

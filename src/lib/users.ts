@@ -1,9 +1,9 @@
 import "server-only";
 
 import { eq } from "drizzle-orm";
-import type { DecodedIdToken } from "firebase-admin/auth";
 
 import { db } from "@/db";
+import type { FirebaseToken } from "@/lib/firebase/admin";
 import { categories, subcategories, teamMembers, teams, users } from "@/db/schema";
 
 const DEFAULT_CATEGORIES: Record<string, string[]> = {
@@ -16,12 +16,12 @@ const DEFAULT_CATEGORIES: Record<string, string[]> = {
 };
 
 /** Crea o actualiza el usuario a partir del token de Firebase. */
-export async function upsertUserFromToken(token: DecodedIdToken) {
+export async function upsertUserFromToken(token: FirebaseToken) {
   const values = {
     firebaseUid: token.uid,
     email: token.email ?? "",
-    displayName: (token.name as string | undefined) ?? null,
-    photoUrl: (token.picture as string | undefined) ?? null,
+    displayName: token.name ?? null,
+    photoUrl: token.picture ?? null,
   };
 
   const [user] = await db
