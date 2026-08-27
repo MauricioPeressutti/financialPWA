@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 import { AnalyticsRange } from "@/components/analytics-range";
+import { AnalyticsMember } from "@/components/analytics-member";
 import { BarRow, WeekdayBars } from "@/components/analytics-bits";
 import { TrendChart } from "@/components/trend-chart";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { requireTeam } from "@/lib/auth";
 import {
   getAnalytics,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/analytics";
 import { formatCents } from "@/lib/money";
 import { PaymentMethodTag, paymentMethodLabels } from "@/lib/payment-methods";
+import { getTeamMembers } from "@/lib/queries";
 
 const RANGES: Range[] = ["1m", "3m", "6m", "1y", "all"];
 
@@ -64,9 +66,16 @@ export default async function AnalyticsPage({
       : "3m";
   const { from, to } = resolveRange(range);
 
+  const members = await getTeamMembers(team.id);
+  const memberId =
+    typeof sp.member === "string" &&
+    members.some((m) => m.userId === sp.member)
+      ? sp.member
+      : undefined;
+
   const [a, trend] = await Promise.all([
-    getAnalytics(team.id, from, to),
-    getMonthlyTrend(team.id, 12),
+    getAnalytics(team.id, from, to, memberId),
+    getMonthlyTrend(team.id, 12, memberId),
   ]);
 
   const empty = a.kpis.count === 0;
@@ -76,7 +85,18 @@ export default async function AnalyticsPage({
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Análisis</h1>
       </div>
-      <AnalyticsRange value={range} />
+      <div className="space-y-2">
+        <AnalyticsRange value={range} />
+        {members.length > 1 && (
+          <AnalyticsMember
+            members={members.map((m) => ({
+              userId: m.userId,
+              name: (m.displayName ?? m.email).split(" ")[0],
+            }))}
+            value={memberId}
+          />
+        )}
+      </div>
 
       {empty ? (
         <p className="py-10 text-center text-sm text-muted-foreground">
@@ -141,6 +161,7 @@ export default async function AnalyticsPage({
             </Section>
           )}
 
+          {!memberId && a.byMember.length > 1 && (
           <Section title="Quién gastó más">
             <div className="divide-y">
               {a.byMember.map((m) => (
@@ -154,6 +175,7 @@ export default async function AnalyticsPage({
               ))}
             </div>
           </Section>
+          )}
 
           <Section title="Formas de pago">
             <div className="divide-y">

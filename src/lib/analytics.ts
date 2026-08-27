@@ -24,16 +24,24 @@ export async function getAnalytics(
   teamId: string,
   from: string,
   to: string,
+  memberId?: string,
 ) {
+  const memberCond = memberId
+    ? [eq(expenses.createdByUserId, memberId)]
+    : [];
+
   const inRange = and(
     eq(expenses.teamId, teamId),
     gte(expenses.spentOn, from),
     lte(expenses.spentOn, to),
+    ...memberCond,
   );
+  // reintegros del período, filtrados por el autor del gasto asociado
   const refInRange = and(
     eq(reimbursements.teamId, teamId),
     gte(reimbursements.reimbursedOn, from),
     lte(reimbursements.reimbursedOn, to),
+    ...memberCond,
   );
 
   const [
@@ -64,6 +72,7 @@ export async function getAnalytics(
         count: sql<number>`count(*)`,
       })
       .from(reimbursements)
+      .innerJoin(expenses, eq(expenses.id, reimbursements.expenseId))
       .where(refInRange),
     db
       .select({
@@ -262,11 +271,16 @@ export async function getAnalytics(
   };
 }
 
-export async function getMonthlyTrend(teamId: string, months = 12) {
+export async function getMonthlyTrend(
+  teamId: string,
+  months = 12,
+  memberId?: string,
+) {
   const start = new Date();
   start.setDate(1);
   start.setMonth(start.getMonth() - (months - 1));
   const from = start.toISOString().slice(0, 10);
+  const byMember = memberId ? [eq(expenses.createdByUserId, memberId)] : [];
 
   const [spend, refunds] = await Promise.all([
     db
@@ -275,7 +289,13 @@ export async function getMonthlyTrend(teamId: string, months = 12) {
         gross: sql<number>`sum(${expenses.amountCents})`,
       })
       .from(expenses)
-      .where(and(eq(expenses.teamId, teamId), gte(expenses.spentOn, from)))
+      .where(
+        and(
+          eq(expenses.teamId, teamId),
+          gte(expenses.spentOn, from),
+          ...byMember,
+        ),
+      )
       .groupBy(sql`to_char(${expenses.spentOn}, 'YYYY-MM')`),
     db
       .select({
@@ -283,10 +303,12 @@ export async function getMonthlyTrend(teamId: string, months = 12) {
         refunded: sql<number>`sum(${reimbursements.amountCents})`,
       })
       .from(reimbursements)
+      .innerJoin(expenses, eq(expenses.id, reimbursements.expenseId))
       .where(
         and(
           eq(reimbursements.teamId, teamId),
           gte(reimbursements.reimbursedOn, from),
+          ...byMember,
         ),
       )
       .groupBy(sql`to_char(${reimbursements.reimbursedOn}, 'YYYY-MM')`),
