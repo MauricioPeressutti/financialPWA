@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +29,38 @@ export default async function DashboardPage({
   ]);
 
   const positive = data.balanceCents >= 0;
+
+  type Mov = {
+    key: string;
+    kind: "gasto" | "ingreso";
+    id: string;
+    date: string;
+    title: string;
+    method: string;
+    amountCents: number;
+  };
+  const movements: Mov[] = [
+    ...recentIncomes.map((e) => ({
+      key: `i${e.id}`,
+      kind: "ingreso" as const,
+      id: e.id,
+      date: e.receivedOn,
+      title: `${e.categoryName}${e.subcategoryName ? ` · ${e.subcategoryName}` : ""}`,
+      method: e.method,
+      amountCents: e.amountCents,
+    })),
+    ...recent.map((e) => ({
+      key: `e${e.id}`,
+      kind: "gasto" as const,
+      id: e.id,
+      date: e.spentOn,
+      title: `${e.categoryName}${e.subcategoryName ? ` · ${e.subcategoryName}` : ""}`,
+      method: e.paymentMethod,
+      amountCents: e.amountCents,
+    })),
+  ]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 12);
 
   return (
     <div className="space-y-5">
@@ -128,47 +161,51 @@ export default async function DashboardPage({
           />
         </div>
         <div className="divide-y">
-          {recentIncomes.slice(0, 3).map((e) => (
-            <Link
-              key={e.id}
-              href={`/incomes/${e.id}`}
-              className="flex items-center justify-between py-2 text-sm"
-            >
-              <div>
-                <p>
-                  {e.categoryName}
-                  {e.subcategoryName ? ` · ${e.subcategoryName}` : ""}
-                </p>
-                <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <span>{e.receivedOn} ·</span>
-                  <IncomeMethodTag method={e.method} />
-                </p>
-              </div>
-              <span className="font-medium text-emerald-600">
-                +{formatCents(e.amountCents)}
-              </span>
-            </Link>
-          ))}
-          {recent.slice(0, 8).map((e) => (
-            <Link
-              key={e.id}
-              href={`/expenses/${e.id}`}
-              className="flex items-center justify-between py-2 text-sm"
-            >
-              <div>
-                <p>
-                  {e.categoryName}
-                  {e.subcategoryName ? ` · ${e.subcategoryName}` : ""}
-                </p>
-                <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <span>{e.spentOn} ·</span>
-                  <PaymentMethodTag method={e.paymentMethod} />
-                </p>
-              </div>
-              <span className="font-medium">{formatCents(e.amountCents)}</span>
-            </Link>
-          ))}
-          {recent.length === 0 && recentIncomes.length === 0 && (
+          {movements.map((m) => {
+            const income = m.kind === "ingreso";
+            return (
+              <Link
+                key={m.key}
+                href={income ? `/incomes/${m.id}` : `/expenses/${m.id}`}
+                className="flex items-center gap-2.5 py-2 text-sm"
+              >
+                <span
+                  className={`grid size-7 shrink-0 place-items-center rounded-full ${
+                    income
+                      ? "bg-emerald-500/15 text-emerald-600"
+                      : "bg-destructive/15 text-destructive"
+                  }`}
+                  aria-hidden
+                >
+                  {income ? (
+                    <ArrowUpRight className="size-4" />
+                  ) : (
+                    <ArrowDownRight className="size-4" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">{m.title}</p>
+                  <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>{m.date} ·</span>
+                    {income ? (
+                      <IncomeMethodTag method={m.method} />
+                    ) : (
+                      <PaymentMethodTag method={m.method} />
+                    )}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 font-medium tabular-nums ${
+                    income ? "text-emerald-600" : ""
+                  }`}
+                >
+                  {income ? "+" : "−"}
+                  {formatCents(m.amountCents)}
+                </span>
+              </Link>
+            );
+          })}
+          {movements.length === 0 && (
             <p className="py-2 text-sm text-muted-foreground">
               Nada por acá todavía.
             </p>
