@@ -3,8 +3,11 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
 import {
   GoogleAuthProvider,
+  browserPopupRedirectResolver,
   getAuth,
+  getRedirectResult,
   signInWithPopup,
+  signInWithRedirect,
   signOut as fbSignOut,
   type Auth,
 } from "firebase/auth";
@@ -30,11 +33,42 @@ export function getClientAuth(): Auth {
   return _auth;
 }
 
-/** Abre el popup de Google y devuelve el ID token del usuario logueado. */
-export async function signInWithGoogle(): Promise<string> {
-  const provider = new GoogleAuthProvider();
-  const cred = await signInWithPopup(getClientAuth(), provider);
+/** El popup no funciona en una PWA instalada / navegador embebido. */
+export function isStandalone(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia?.("(display-mode: standalone)").matches ||
+    // iOS Safari
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true
+  );
+}
+
+const googleProvider = () => {
+  const p = new GoogleAuthProvider();
+  p.setCustomParameters({ prompt: "select_account" });
+  return p;
+};
+
+/** Popup (desktop). Devuelve el ID token. */
+export async function signInWithGooglePopup(): Promise<string> {
+  const cred = await signInWithPopup(
+    getClientAuth(),
+    googleProvider(),
+    browserPopupRedirectResolver,
+  );
   return cred.user.getIdToken();
+}
+
+/** Redirect (PWA / mobile). La página navega a Google y vuelve. */
+export async function signInWithGoogleRedirect(): Promise<void> {
+  await signInWithRedirect(getClientAuth(), googleProvider());
+}
+
+/** Al volver del redirect: devuelve el ID token si hay un login pendiente. */
+export async function completeGoogleRedirect(): Promise<string | null> {
+  const result = await getRedirectResult(getClientAuth());
+  if (!result) return null;
+  return result.user.getIdToken();
 }
 
 export async function signOutClient(): Promise<void> {

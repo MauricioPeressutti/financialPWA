@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -12,25 +12,69 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { signInWithGoogle } from "@/lib/firebase/client";
+import {
+  completeGoogleRedirect,
+  isStandalone,
+  signInWithGooglePopup,
+  signInWithGoogleRedirect,
+} from "@/lib/firebase/client";
+
+const NEXT_KEY = "postLoginNext";
 
 export function SignInForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [loading, setLoading] = useState(false);
 
+  async function exchangeAndGo(idToken: string) {
+    const res = await fetch("/api/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken }),
+    });
+    if (!res.ok) throw new Error("No se pudo iniciar sesión");
+    let next = params.get("next");
+    try {
+      next = next || sessionStorage.getItem(NEXT_KEY);
+      sessionStorage.removeItem(NEXT_KEY);
+    } catch {}
+    router.replace(next || "/");
+    router.refresh();
+  }
+
+  // Al volver del redirect de Google
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const idToken = await completeGoogleRedirect();
+        if (!idToken || cancelled) return;
+        setLoading(true);
+        await exchangeAndGo(idToken);
+      } catch (err) {
+        console.error(err);
+        toast.error("No se pudo completar el ingreso");
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSignIn() {
     setLoading(true);
     try {
-      const idToken = await signInWithGoogle();
-      const res = await fetch("/api/auth/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idToken }),
-      });
-      if (!res.ok) throw new Error("No se pudo iniciar sesión");
-      router.replace(params.get("next") || "/");
-      router.refresh();
+      if (isStandalone()) {
+        try {
+          sessionStorage.setItem(NEXT_KEY, params.get("next") || "/");
+        } catch {}
+        await signInWithGoogleRedirect(); // la página navega a Google
+        return;
+      }
+      const idToken = await signInWithGooglePopup();
+      await exchangeAndGo(idToken);
     } catch (err) {
       console.error(err);
       toast.error("No se pudo iniciar sesión con Google");
