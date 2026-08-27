@@ -2,7 +2,8 @@ import "server-only";
 
 import { PAYMENT_METHODS, paymentMethodMeta } from "@/lib/payment-methods";
 
-const MODEL = "gemini-2.0-flash";
+// Se puede sobreescribir con la env var GEMINI_MODEL sin tocar el código.
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 export type ParsedExpense = {
