@@ -408,6 +408,57 @@
   }
 }
 
+/* Estrella fugaz — el destello ocurre en el primer ~10% del ciclo,
+   el resto del tiempo queda invisible (por eso pasa "cada tanto"). */
+.shooting-star {
+  position: absolute;
+  width: 130px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklab, var(--glow) 45%, transparent) 60%,
+    color-mix(in oklab, var(--glow) 95%, white) 100%
+  );
+  filter: drop-shadow(0 0 4px color-mix(in oklab, var(--glow) 60%, transparent));
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: shoot var(--sf-cycle, 20s) linear var(--sf-delay, 0s) infinite;
+}
+.shooting-star::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 10px 2px #fff,
+    0 0 20px 5px color-mix(in oklab, var(--glow) 75%, transparent);
+}
+
+@keyframes shoot {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(var(--sf-angle, 170deg));
+  }
+  2% {
+    opacity: 1;
+  }
+  9% {
+    opacity: 0.9;
+  }
+  13%,
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--sf-tx, -130vw), var(--sf-ty, 34vh), 0)
+      rotate(var(--sf-angle, 170deg));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 /** box-shadows sin color (heredan `color`) para un campo de estrellas. */
 function makeStars(count: number, area: number) {
@@ -45,7 +45,7 @@ export function CosmicBackground() {
         nearRef.current.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
     };
     const onMove = (e: MouseEvent) => {
-      // parallax 0.6×
+      // parallax 0.6x
       tx = (e.clientX / window.innerWidth - 0.5) * 16;
       ty = (e.clientY / window.innerHeight - 0.5) * 16;
       if (!raf) raf = requestAnimationFrame(apply);
@@ -57,6 +57,36 @@ export function CosmicBackground() {
       if (raf) cancelAnimationFrame(raf);
     };
   }, [mounted]);
+
+  const shootingStars: CSSProperties[] = [
+    {
+      top: "7%",
+      left: "80%",
+      "--sf-angle": "167deg",
+      "--sf-tx": "-140vw",
+      "--sf-ty": "40vh",
+      "--sf-cycle": "17s",
+      "--sf-delay": "5s",
+    } as CSSProperties,
+    {
+      top: "-3%",
+      left: "58%",
+      "--sf-angle": "174deg",
+      "--sf-tx": "-120vw",
+      "--sf-ty": "28vh",
+      "--sf-cycle": "27s",
+      "--sf-delay": "14s",
+    } as CSSProperties,
+    {
+      top: "16%",
+      left: "94%",
+      "--sf-angle": "161deg",
+      "--sf-tx": "-150vw",
+      "--sf-ty": "52vh",
+      "--sf-cycle": "22s",
+      "--sf-delay": "34s",
+    } as CSSProperties,
+  ];
 
   return (
     <div
@@ -84,7 +114,7 @@ export function CosmicBackground() {
         </filter>
       </svg>
 
-      {/* Capa lejana — nebulosas difuminadas + filamentos + estrellas tenues */}
+      {/* Capa lejana: nebulosas difuminadas + filamentos + estrellas tenues */}
       <div
         ref={farRef}
         className="absolute inset-0 will-change-transform"
@@ -148,7 +178,7 @@ export function CosmicBackground() {
         )}
       </div>
 
-      {/* Capa intermedia — órbitas con objetos luminosos */}
+      {/* Capa intermedia: orbitas con objetos luminosos */}
       <div
         ref={midRef}
         className="absolute inset-0 will-change-transform"
@@ -190,7 +220,7 @@ export function CosmicBackground() {
         </div>
       </div>
 
-      {/* Capa cercana — puntos de luz flotando (parpadeo suave) */}
+      {/* Capa cercana: puntos de luz flotando (parpadeo suave) */}
       {mounted && (
         <div ref={nearRef} className="absolute inset-0 will-change-transform">
           <div
@@ -211,10 +241,16 @@ export function CosmicBackground() {
         </div>
       )}
 
-      {/* Grano fino — evita el banding de los degradados */}
+      {/* Estrellas fugaces: 3, con timings distintos para que pasen cada tanto */}
+      {mounted &&
+        shootingStars.map((s, i) => (
+          <div key={i} className="shooting-star" style={s} />
+        ))}
+
+      {/* Grano fino: evita el banding de los degradados */}
       <div className="cosmic-grain absolute inset-0" />
 
-      {/* Viñeta para mantener legible el contenido */}
+      {/* Vineta para mantener legible el contenido */}
       <div
         className="absolute inset-0"
         style={{
