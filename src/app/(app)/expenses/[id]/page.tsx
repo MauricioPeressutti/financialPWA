@@ -1,0 +1,74 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { Button } from "@/components/ui/button";
+import { DeleteExpenseButton } from "@/components/delete-expense-button";
+import { ReimbursementSection } from "@/components/reimbursement-section";
+import { requireTeam } from "@/lib/auth";
+import { formatCents, PAYMENT_METHOD_LABELS } from "@/lib/money";
+import { getExpense } from "@/lib/queries";
+
+export default async function ExpenseDetailPage({
+  params,
+}: PageProps<"/expenses/[id]">) {
+  const { team } = await requireTeam();
+  const { id } = await params;
+  const expense = await getExpense(team.id, id);
+  if (!expense) notFound();
+
+  const reimbursed = expense.reimbursements.reduce((a, r) => a + r.amountCents, 0);
+  const net = expense.amountCents - reimbursed;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">Gasto</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          render={<Link href={`/expenses/${id}/edit`}>Editar</Link>}
+        />
+      </div>
+
+      <div className="rounded-lg border p-4">
+        <p className="text-3xl font-bold">{formatCents(expense.amountCents)}</p>
+        {reimbursed > 0 && (
+          <p className="mt-1 text-sm text-emerald-600">
+            Reintegrado {formatCents(reimbursed)} · neto {formatCents(net)}
+          </p>
+        )}
+        <dl className="mt-4 space-y-1.5 text-sm">
+          <Row k="Fecha" v={expense.spentOn} />
+          <Row
+            k="Categoría"
+            v={`${expense.categoryName}${expense.subcategoryName ? ` · ${expense.subcategoryName}` : ""}`}
+          />
+          <Row k="Forma de pago" v={PAYMENT_METHOD_LABELS[expense.paymentMethod]} />
+          {expense.description && <Row k="Descripción" v={expense.description} />}
+          {expense.createdBy && <Row k="Cargado por" v={expense.createdBy} />}
+        </dl>
+      </div>
+
+      <ReimbursementSection
+        expenseId={id}
+        reimbursements={expense.reimbursements.map((r) => ({
+          id: r.id,
+          amountCents: r.amountCents,
+          note: r.note,
+          reimbursedOn: r.reimbursedOn,
+        }))}
+      />
+
+      <DeleteExpenseButton id={id} />
+    </div>
+  );
+}
+
+function Row({ k, v }: { k: string; v: string }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <dt className="text-muted-foreground">{k}</dt>
+      <dd className="text-right">{v}</dd>
+    </div>
+  );
+}

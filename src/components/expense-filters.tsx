@@ -1,0 +1,109 @@
+"use client";
+
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+
+const ALL = "__all__";
+
+export function ExpenseFilters({
+  categories,
+}: {
+  categories: { id: string; name: string }[];
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+
+  function set(key: string, value: string | undefined) {
+    const sp = new URLSearchParams(params);
+    if (value && value !== ALL) sp.set(key, value);
+    else sp.delete(key);
+    router.push(`${pathname}?${sp.toString()}`);
+  }
+
+  const hasFilters = ["from", "to", "categoryId", "paymentMethod"].some((k) =>
+    params.get(k),
+  );
+
+  return (
+    <div className="space-y-3 rounded-lg border p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Desde</Label>
+          <Input
+            type="date"
+            defaultValue={params.get("from") ?? ""}
+            onChange={(e) => set("from", e.target.value)}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Hasta</Label>
+          <Input
+            type="date"
+            defaultValue={params.get("to") ?? ""}
+            onChange={(e) => set("to", e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Categoría</Label>
+          <Select
+            value={params.get("categoryId") ?? ALL}
+            onValueChange={(v) => set("categoryId", v ?? undefined)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Forma de pago</Label>
+          <Select
+            value={params.get("paymentMethod") ?? ALL}
+            onValueChange={(v) => set("paymentMethod", v ?? undefined)}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas</SelectItem>
+              <SelectItem value="efectivo">Efectivo</SelectItem>
+              <SelectItem value="debito">Débito</SelectItem>
+              <SelectItem value="credito">Crédito</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {hasFilters && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push(pathname)}
+        >
+          Limpiar filtros
+        </Button>
+      )}
+    </div>
+  );
+}
