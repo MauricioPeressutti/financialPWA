@@ -1,10 +1,7 @@
-import {
-  Banknote,
-  CreditCard,
-  Smartphone,
-  Wallet,
-  type LucideIcon,
-} from "lucide-react";
+import type { ComponentType } from "react";
+import { Banknote, CreditCard } from "lucide-react";
+
+import { MercadoPagoIcon, ModoIcon } from "@/components/brand-icons";
 
 export const PAYMENT_METHODS = [
   "efectivo",
@@ -17,16 +14,18 @@ export const PAYMENT_METHODS = [
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
+type IconComponent = ComponentType<{ className?: string }>;
+
 export const paymentMethodMeta: Record<
   PaymentMethod,
-  { label: string; Icon: LucideIcon }
+  { label: string; Icon: IconComponent }
 > = {
   efectivo: { label: "Efectivo", Icon: Banknote },
   debito: { label: "Débito", Icon: CreditCard },
   credito: { label: "Crédito", Icon: CreditCard },
-  modo_debito: { label: "MODO débito", Icon: Smartphone },
-  modo_credito: { label: "MODO crédito", Icon: Smartphone },
-  mercadopago: { label: "Mercado Pago", Icon: Wallet },
+  modo_debito: { label: "MODO débito", Icon: ModoIcon },
+  modo_credito: { label: "MODO crédito", Icon: ModoIcon },
+  mercadopago: { label: "Mercado Pago", Icon: MercadoPagoIcon },
 };
 
 export const paymentMethodLabels: Record<string, string> = Object.fromEntries(
@@ -46,7 +45,7 @@ export function PaymentMethodTag({
   const { label, Icon } = meta;
   return (
     <span className={`inline-flex items-center gap-1.5 ${className ?? ""}`}>
-      <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+      <Icon className="size-3.5 shrink-0" />
       {label}
     </span>
   );
