@@ -213,10 +213,9 @@ export default async function DashboardPage({
         </div>
       </section>
 
-      <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-10 flex flex-col gap-2">
+      <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-10 flex flex-col items-end gap-2">
         <Button
-          variant="outline"
-          className="h-11 rounded-full px-5 shadow-lg"
+          className="h-11 rounded-full border-0 bg-emerald-600 px-5 text-white shadow-lg hover:bg-emerald-700"
           render={<Link href="/incomes/new">+ Ingreso</Link>}
         />
         <Button
