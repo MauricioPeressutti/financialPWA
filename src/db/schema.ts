@@ -40,6 +40,19 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── Vínculo con Telegram ──────────────────────────────
+export const telegramLinks = pgTable("telegram_links", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  code: text("code").notNull().unique(),
+  telegramUserId: text("telegram_user_id").unique(),
+  telegramChatId: text("telegram_chat_id"),
+  linkedAt: timestamp("linked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ─── Equipos ───────────────────────────────────────────
 export const teams = pgTable("teams", {
   id: uuid("id").defaultRandom().primaryKey(),

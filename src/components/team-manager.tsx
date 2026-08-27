@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Copy } from "lucide-react";
+import { Copy, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import {
   renameTeam,
   revokeInvitation,
 } from "@/lib/actions/team";
+import { linkTelegram, unlinkTelegram } from "@/lib/actions/telegram";
 
 type Member = {
   userId: string;
@@ -29,17 +30,20 @@ export function TeamManager({
   team,
   members,
   invites,
+  telegramLinked,
 }: {
   isOwner: boolean;
   currentUserId: string;
   team: { name: string };
   members: Member[];
   invites: Invite[];
+  telegramLinked: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState(team.name);
   const [lastLink, setLastLink] = useState<string | null>(null);
+  const [tgLink, setTgLink] = useState<string | null>(null);
 
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "";
@@ -92,6 +96,87 @@ export function TeamManager({
           </div>
         </section>
       )}
+
+      <section className="space-y-3">
+        <p className="text-sm font-medium text-muted-foreground">
+          Cargar gastos por Telegram
+        </p>
+        {telegramLinked ? (
+          <div className="flex items-center justify-between rounded-lg border p-3 text-sm">
+            <span className="flex items-center gap-2">
+              <Send className="size-4 text-primary" />
+              Vinculado
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const r = await unlinkTelegram();
+                  if (!r.ok) {
+                    toast.error(r.error);
+                    return;
+                  }
+                  setTgLink(null);
+                  toast.success("Telegram desvinculado");
+                  router.refresh();
+                })
+              }
+            >
+              Desvincular
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Vinculá tu Telegram y cargá gastos escribiéndole al bot en lenguaje
+              normal (ej: <i>&ldquo;5300 chino con débito&rdquo;</i>).
+            </p>
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const r = await linkTelegram();
+                  if (!r.ok) {
+                    toast.error(r.error);
+                    return;
+                  }
+                  setTgLink(r.url);
+                })
+              }
+            >
+              <Send className="size-4" />
+              Generar link de Telegram
+            </Button>
+            {tgLink && (
+              <div className="space-y-2 rounded-lg border p-3 text-xs">
+                <p className="text-muted-foreground">
+                  Abrí este link en tu teléfono y tocá <b>Start</b>:
+                </p>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={tgLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-0 flex-1 truncate text-primary underline"
+                  >
+                    {tgLink}
+                  </a>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => copy(tgLink)}
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       <section className="space-y-2">
         <p className="text-sm font-medium text-muted-foreground">Miembros</p>

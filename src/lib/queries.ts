@@ -11,6 +11,7 @@ import {
   teamInvitations,
   teamMembers,
   teams,
+  telegramLinks,
   users,
 } from "@/db/schema";
 import type { PaymentMethod } from "@/lib/payment-methods";
@@ -215,6 +216,15 @@ export async function getTeamMembers(teamId: string) {
     .innerJoin(users, eq(users.id, teamMembers.userId))
     .where(eq(teamMembers.teamId, teamId))
     .orderBy(teamMembers.createdAt);
+}
+
+export async function getTelegramLink(userId: string) {
+  const [row] = await db
+    .select({ linked: telegramLinks.linkedAt })
+    .from(telegramLinks)
+    .where(eq(telegramLinks.userId, userId))
+    .limit(1);
+  return { linked: Boolean(row?.linked) };
 }
 
 export async function getInvitationPreview(token: string) {

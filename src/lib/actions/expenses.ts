@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { expenses, reimbursements, subcategories } from "@/db/schema";
+import { expenses, reimbursements } from "@/db/schema";
 import { requireTeam } from "@/lib/auth";
+import { insertExpense } from "@/lib/expenses-core";
 import { parseAmountToCents } from "@/lib/money";
 import { expenseInput, reimbursementInput } from "@/lib/validation";
 
@@ -19,43 +20,19 @@ export async function createExpense(raw: unknown): Promise<ActionResult> {
   const cents = parseAmountToCents(parsed.data.amount);
   if (cents === null || cents === 0) return { ok: false, error: "Monto inválido" };
 
-  const subId = parsed.data.subcategoryId || null;
-  if (subId) {
-    const [sub] = await db
-      .select({ id: subcategories.id })
-      .from(subcategories)
-      .where(and(eq(subcategories.id, subId), eq(subcategories.teamId, team.id)))
-      .limit(1);
-    if (!sub) return { ok: false, error: "Subcategoría inválida" };
-  }
-
-  const [created] = await db
-    .insert(expenses)
-    .values({
-      teamId: team.id,
-      createdByUserId: user.id,
-      amountCents: cents,
-      categoryId: parsed.data.categoryId,
-      subcategoryId: subId,
-      paymentMethod: parsed.data.paymentMethod,
-      description: parsed.data.description || null,
-      spentOn: parsed.data.spentOn,
-    })
-    .returning({ id: expenses.id });
-
-  // Reintegro inmediato (opcional) — mismo día que el gasto.
   const refundCents = parsed.data.reimbursedAmount
     ? parseAmountToCents(parsed.data.reimbursedAmount)
     : null;
-  if (refundCents !== null && refundCents > 0) {
-    await db.insert(reimbursements).values({
-      expenseId: created.id,
-      teamId: team.id,
-      amountCents: refundCents,
-      note: "Reintegro al cargar el gasto",
-      reimbursedOn: parsed.data.spentOn,
-    });
-  }
+
+  await insertExpense(team.id, user.id, {
+    amountCents: cents,
+    categoryId: parsed.data.categoryId,
+    subcategoryId: parsed.data.subcategoryId || null,
+    paymentMethod: parsed.data.paymentMethod,
+    description: parsed.data.description || null,
+    spentOn: parsed.data.spentOn,
+    reimbursedCents: refundCents,
+  });
 
   revalidatePath("/");
   revalidatePath("/expenses");
