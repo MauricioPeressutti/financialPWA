@@ -206,6 +206,9 @@
   body {
     @apply text-foreground;
     position: relative;
+    /* crea contexto de apilamiento para que la capa -z-10 (CosmicBackground)
+       se pinte por encima del fondo del body y no quede oculta */
+    isolation: isolate;
     min-height: 100dvh;
     background-color: var(--background);
     background-image:
