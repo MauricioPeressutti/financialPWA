@@ -43,11 +43,7 @@ export function isStandalone(): boolean {
   );
 }
 
-const googleProvider = () => {
-  const p = new GoogleAuthProvider();
-  p.setCustomParameters({ prompt: "select_account" });
-  return p;
-};
+const googleProvider = () => new GoogleAuthProvider();
 
 /** Popup (desktop). Devuelve el ID token. */
 export async function signInWithGooglePopup(): Promise<string> {
