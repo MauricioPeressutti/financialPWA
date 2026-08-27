@@ -63,7 +63,7 @@ export function AppShell({ user, team, teams, children }: Props) {
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-1 flex-col">
-      <header className="cosmic-panel sticky top-0 z-20 flex items-center justify-between border-b px-4 py-3">
+      <header className="cosmic-panel sticky top-0 z-20 flex items-center justify-between border-b px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <div>
           <p className="text-[0.7rem] uppercase tracking-widest text-muted-foreground">
             Equipo
@@ -106,9 +106,11 @@ export function AppShell({ user, team, teams, children }: Props) {
         </div>
       </header>
 
-      <main className="flex-1 px-4 py-4 pb-24">{children}</main>
+      <main className="flex-1 px-4 py-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))]">
+        {children}
+      </main>
 
-      <nav className="cosmic-panel fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-lg justify-around border-t">
+      <nav className="cosmic-panel fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-lg justify-around border-t pb-[env(safe-area-inset-bottom)]">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
@@ -116,7 +118,7 @@ export function AppShell({ user, team, teams, children }: Props) {
               key={href}
               href={href}
               className={cn(
-                "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[0.7rem] transition-colors duration-300",
+                "relative flex flex-1 flex-col items-center gap-1.5 py-3.5 text-[0.7rem] transition-colors duration-300",
                 active
                   ? "text-primary [&_svg]:drop-shadow-[0_0_8px_rgba(111,255,233,0.55)]"
                   : "text-muted-foreground hover:text-foreground",

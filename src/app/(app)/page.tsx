@@ -129,7 +129,7 @@ export default async function DashboardPage({
       </section>
 
       <Button
-        className="fixed bottom-20 right-4 z-10 h-12 rounded-full px-5 shadow-lg"
+        className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-10 h-12 rounded-full px-5 shadow-lg"
         render={<Link href="/expenses/new">+ Gasto</Link>}
       />
     </div>
