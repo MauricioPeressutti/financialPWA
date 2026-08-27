@@ -27,7 +27,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Excluye: api, _next, healthz y cualquier archivo con extensión
-  // (íconos .png/.svg, manifest, etc. — si no, el proxy los redirige a /sign-in).
-  matcher: ["/((?!api/|_next/|healthz|.*\\.[\\w]+$).*)"],
+  // Excluye: api, _next, __/ (handlers de Firebase Auth), healthz y cualquier
+  // archivo con extensión (íconos, manifest…) — si no, se redirigen a /sign-in.
+  matcher: ["/((?!api/|_next/|__/|healthz|.*\\.[\\w]+$).*)"],
 };
