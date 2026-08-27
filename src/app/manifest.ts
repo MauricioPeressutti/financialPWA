@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Gastos compartidos de la familia",
     start_url: "/",
     display: "standalone",
-    background_color: "#0a0a0a",
-    theme_color: "#0a0a0a",
+    background_color: "#0B132B",
+    theme_color: "#0B132B",
     lang: "es-AR",
     icons: [
       {
