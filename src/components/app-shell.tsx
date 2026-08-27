@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -81,19 +82,28 @@ export function AppShell({ user, team, teams, children }: Props) {
             }
           />
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
+            <div className="truncate px-1.5 py-1 text-xs font-medium text-muted-foreground">
+              {user.email}
+            </div>
             {teams.length > 1 && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                  Cambiar de equipo
-                </DropdownMenuLabel>
-                {teams.map((t) => (
-                  <DropdownMenuItem key={t.id} onClick={() => handleSwitch(t.id)}>
-                    {t.id === team.id && <Check className="size-4" />}
-                    <span className={cn(t.id !== team.id && "ml-6")}>{t.name}</span>
-                  </DropdownMenuItem>
-                ))}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="font-normal">
+                    Cambiar de equipo
+                  </DropdownMenuLabel>
+                  {teams.map((t) => (
+                    <DropdownMenuItem
+                      key={t.id}
+                      onClick={() => handleSwitch(t.id)}
+                    >
+                      {t.id === team.id && <Check className="size-4" />}
+                      <span className={cn(t.id !== team.id && "ml-6")}>
+                        {t.name}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
               </>
             )}
             <DropdownMenuSeparator />
