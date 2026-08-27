@@ -1,8 +1,6 @@
 import type { ComponentType } from "react";
 import { Banknote, CreditCard } from "lucide-react";
 
-import { MercadoPagoIcon, ModoIcon } from "@/components/brand-icons";
-
 export const PAYMENT_METHODS = [
   "efectivo",
   "debito",
@@ -15,6 +13,16 @@ export const PAYMENT_METHODS = [
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 type IconComponent = ComponentType<{ className?: string }>;
+
+const BrandImg =
+  (src: string, alt: string): IconComponent =>
+  ({ className }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} className={className} loading="lazy" decoding="async" />
+  );
+
+const ModoIcon = BrandImg("/modo.png", "MODO");
+const MercadoPagoIcon = BrandImg("/mercadopago.png", "Mercado Pago");
 
 export const paymentMethodMeta: Record<
   PaymentMethod,
@@ -45,7 +53,7 @@ export function PaymentMethodTag({
   const { label, Icon } = meta;
   return (
     <span className={`inline-flex items-center gap-1.5 ${className ?? ""}`}>
-      <Icon className="size-3.5 shrink-0" />
+      <Icon className="size-4 shrink-0 rounded-[3px]" />
       {label}
     </span>
   );
