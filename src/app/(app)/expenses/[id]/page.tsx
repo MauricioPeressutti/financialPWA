@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { DeleteExpenseButton } from "@/components/delete-expense-button";
 import { ReimbursementSection } from "@/components/reimbursement-section";
 import { requireTeam } from "@/lib/auth";
-import { formatCents, PAYMENT_METHOD_LABELS } from "@/lib/money";
+import { formatCents } from "@/lib/money";
+import { paymentMethodLabels } from "@/lib/payment-methods";
 import { getExpense } from "@/lib/queries";
 
 export default async function ExpenseDetailPage({
@@ -43,7 +44,7 @@ export default async function ExpenseDetailPage({
             k="Categoría"
             v={`${expense.categoryName}${expense.subcategoryName ? ` · ${expense.subcategoryName}` : ""}`}
           />
-          <Row k="Forma de pago" v={PAYMENT_METHOD_LABELS[expense.paymentMethod]} />
+          <Row k="Forma de pago" v={paymentMethodLabels[expense.paymentMethod]} />
           {expense.description && <Row k="Descripción" v={expense.description} />}
           {expense.createdBy && <Row k="Cargado por" v={expense.createdBy} />}
         </dl>

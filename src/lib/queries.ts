@@ -13,6 +13,7 @@ import {
   teams,
   users,
 } from "@/db/schema";
+import type { PaymentMethod } from "@/lib/payment-methods";
 
 /** Rango [primer día, último día] del mes YYYY-MM como strings de fecha. */
 export function monthRange(month: string) {
@@ -66,7 +67,7 @@ export type ExpenseFilters = {
   from?: string;
   to?: string;
   categoryId?: string;
-  paymentMethod?: "efectivo" | "debito" | "credito";
+  paymentMethod?: PaymentMethod;
 };
 
 export async function listExpenses(teamId: string, filters: ExpenseFilters = {}) {

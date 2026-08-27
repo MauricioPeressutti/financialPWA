@@ -31,9 +31,3 @@ export function parseAmountToCents(input: string): number | null {
   if (!Number.isFinite(value) || value < 0) return null;
   return Math.round(value * 100);
 }
-
-export const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  efectivo: "Efectivo",
-  debito: "Débito",
-  credito: "Crédito",
-};

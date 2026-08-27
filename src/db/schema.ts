@@ -16,6 +16,9 @@ export const paymentMethod = pgEnum("payment_method", [
   "efectivo",
   "debito",
   "credito",
+  "modo_debito",
+  "modo_credito",
+  "mercadopago",
 ]);
 
 export const memberRole = pgEnum("member_role", ["owner", "member"]);

@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ExpenseFilters } from "@/components/expense-filters";
 import { requireTeam } from "@/lib/auth";
-import { formatCents, PAYMENT_METHOD_LABELS } from "@/lib/money";
+import { formatCents } from "@/lib/money";
+import { PaymentMethodTag, type PaymentMethod } from "@/lib/payment-methods";
 import { getActiveCategories, listExpenses } from "@/lib/queries";
 
 export default async function ExpensesPage({ searchParams }: PageProps<"/expenses">) {
@@ -17,11 +18,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
     from: str(sp.from),
     to: str(sp.to),
     categoryId: str(sp.categoryId),
-    paymentMethod: str(sp.paymentMethod) as
-      | "efectivo"
-      | "debito"
-      | "credito"
-      | undefined,
+    paymentMethod: str(sp.paymentMethod) as PaymentMethod | undefined,
   };
 
   const [categories, rows] = await Promise.all([
@@ -62,9 +59,11 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
                   {e.categoryName}
                   {e.subcategoryName ? ` · ${e.subcategoryName}` : ""}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {e.spentOn} · {PAYMENT_METHOD_LABELS[e.paymentMethod]}
-                  {e.description ? ` · ${e.description}` : ""}
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span>{e.spentOn}</span>
+                  <span>·</span>
+                  <PaymentMethodTag method={e.paymentMethod} />
+                  {e.description ? <span>· {e.description}</span> : null}
                 </p>
               </div>
               <div className="shrink-0 text-right">

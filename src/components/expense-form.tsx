@@ -18,6 +18,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { createExpense, updateExpense } from "@/lib/actions/expenses";
+import {
+  PAYMENT_METHODS,
+  paymentMethodMeta,
+  type PaymentMethod,
+} from "@/lib/payment-methods";
 import { expenseInput, type ExpenseInput } from "@/lib/validation";
 
 type Category = {
@@ -34,7 +39,7 @@ type Props = {
     spentOn: string;
     categoryId: string;
     subcategoryId: string | null;
-    paymentMethod: "efectivo" | "debito" | "credito";
+    paymentMethod: PaymentMethod;
     description: string | null;
   };
 };
@@ -69,11 +74,9 @@ export function ExpenseForm({ categories, expense }: Props) {
     () => Object.fromEntries(subs.map((s) => [s.id, s.name])),
     [subs],
   );
-  const paymentItems = {
-    efectivo: "Efectivo",
-    debito: "Débito",
-    credito: "Crédito",
-  };
+  const paymentItems = Object.fromEntries(
+    PAYMENT_METHODS.map((m) => [m, paymentMethodMeta[m].label]),
+  );
 
   async function onSubmit(values: ExpenseInput) {
     const res = expense
@@ -181,9 +184,15 @@ export function ExpenseForm({ categories, expense }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="efectivo">Efectivo</SelectItem>
-                <SelectItem value="debito">Débito</SelectItem>
-                <SelectItem value="credito">Crédito</SelectItem>
+                {PAYMENT_METHODS.map((m) => {
+                  const { label, Icon } = paymentMethodMeta[m];
+                  return (
+                    <SelectItem key={m} value={m}>
+                      <Icon className="size-4 text-muted-foreground" />
+                      {label}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           )}

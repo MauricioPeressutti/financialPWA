@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { PAYMENT_METHODS, paymentMethodMeta } from "@/lib/payment-methods";
 
 const ALL = "__all__";
 
@@ -85,9 +86,9 @@ export function ExpenseFilters({
           <Select
             items={{
               [ALL]: "Todas",
-              efectivo: "Efectivo",
-              debito: "Débito",
-              credito: "Crédito",
+              ...Object.fromEntries(
+                PAYMENT_METHODS.map((m) => [m, paymentMethodMeta[m].label]),
+              ),
             }}
             value={params.get("paymentMethod") ?? ALL}
             onValueChange={(v) => set("paymentMethod", v ?? undefined)}
@@ -97,9 +98,15 @@ export function ExpenseFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={ALL}>Todas</SelectItem>
-              <SelectItem value="efectivo">Efectivo</SelectItem>
-              <SelectItem value="debito">Débito</SelectItem>
-              <SelectItem value="credito">Crédito</SelectItem>
+              {PAYMENT_METHODS.map((m) => {
+                const { label, Icon } = paymentMethodMeta[m];
+                return (
+                  <SelectItem key={m} value={m}>
+                    <Icon className="size-4 text-muted-foreground" />
+                    {label}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>

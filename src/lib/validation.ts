@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+import { PAYMENT_METHODS } from "@/lib/payment-methods";
+
 export const expenseInput = z.object({
   amount: z.string().min(1, "Ingresá un monto"),
   spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
   categoryId: z.string().uuid("Elegí una categoría"),
   subcategoryId: z.string().uuid().optional().or(z.literal("")),
-  paymentMethod: z.enum(["efectivo", "debito", "credito"]),
+  paymentMethod: z.enum(PAYMENT_METHODS),
   description: z.string().max(280).optional().or(z.literal("")),
   // Reintegro inmediato opcional (ej: MODO devuelve al toque). Se anota
   // como reintegro del mismo gasto, con la fecha del gasto.

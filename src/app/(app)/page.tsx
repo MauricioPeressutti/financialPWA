@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireTeam } from "@/lib/auth";
-import { formatCents, PAYMENT_METHOD_LABELS } from "@/lib/money";
+import { formatCents } from "@/lib/money";
+import { PaymentMethodTag } from "@/lib/payment-methods";
 import { currentMonth, getMonthlyDashboard, listExpenses } from "@/lib/queries";
 import { MonthPicker } from "@/components/month-picker";
 
@@ -87,7 +88,7 @@ export default async function DashboardPage({
                 key={m.paymentMethod}
                 className="flex justify-between border-b py-1.5 text-sm"
               >
-                <span>{PAYMENT_METHOD_LABELS[m.paymentMethod]}</span>
+                <PaymentMethodTag method={m.paymentMethod} />
                 <span className="font-medium">{formatCents(m.totalCents)}</span>
               </div>
             ))}
@@ -113,8 +114,9 @@ export default async function DashboardPage({
             >
               <div>
                 <p>{e.categoryName}{e.subcategoryName ? ` · ${e.subcategoryName}` : ""}</p>
-                <p className="text-xs text-muted-foreground">
-                  {e.spentOn} · {PAYMENT_METHOD_LABELS[e.paymentMethod]}
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <span>{e.spentOn} ·</span>
+                  <PaymentMethodTag method={e.paymentMethod} />
                 </p>
               </div>
               <span className="font-medium">{formatCents(e.amountCents)}</span>
