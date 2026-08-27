@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
-import { Home, ListPlus, Tags, Users, LogOut, Check } from "lucide-react";
+import {
+  Home,
+  ListPlus,
+  ChartColumn,
+  Tags,
+  Users,
+  LogOut,
+  Check,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +37,7 @@ type Props = {
 const NAV = [
   { href: "/", label: "Inicio", icon: Home },
   { href: "/expenses", label: "Gastos", icon: ListPlus },
+  { href: "/analytics", label: "Análisis", icon: ChartColumn },
   { href: "/categories", label: "Categorías", icon: Tags },
   { href: "/team", label: "Equipo", icon: Users },
 ];
