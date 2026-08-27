@@ -30,7 +30,7 @@ export function AnalyticsRange({ value }: { value: AnalyticsRange }) {
           onClick={() => set(r)}
           aria-pressed={r === value}
           className={cn(
-            "flex-1 rounded-md px-2 py-1.5 transition-colors",
+            "flex-1 whitespace-nowrap rounded-md px-2 py-1.5 transition-colors",
             r === value
               ? "bg-primary/20 text-foreground"
               : "text-muted-foreground hover:text-foreground",

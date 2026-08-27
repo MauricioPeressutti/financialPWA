@@ -5,10 +5,10 @@ export type AnalyticsRange = "1m" | "3m" | "6m" | "1y" | "all";
 export const RANGE_ORDER: AnalyticsRange[] = ["1m", "3m", "6m", "1y", "all"];
 
 export const RANGE_LABELS: Record<AnalyticsRange, string> = {
-  "1m": "1 mes",
-  "3m": "3 meses",
-  "6m": "6 meses",
-  "1y": "1 año",
+  "1m": "1M",
+  "3m": "3M",
+  "6m": "6M",
+  "1y": "1A",
   all: "Todo",
 };
 
