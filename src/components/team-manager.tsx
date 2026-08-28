@@ -39,6 +39,7 @@ import {
   setGoalsEnabled,
   updateTeamCurrencies,
 } from "@/lib/actions/team";
+import { WhoInvites } from "@/components/games/who-invites";
 import { linkTelegram, unlinkTelegram } from "@/lib/actions/telegram";
 import {
   CURRENCIES,
@@ -449,6 +450,14 @@ export function TeamManager({
           </>
         )}
       </section>
+
+      {/* ── ¿Quién invita hoy? ── */}
+      <WhoInvites
+        players={members.map((m) => ({
+          id: m.userId,
+          name: (m.name ?? m.email).split(" ")[0],
+        }))}
+      />
 
       {/* ── Calculadora de esfuerzo ── */}
       <EffortSection isOwner={isOwner} enabled={effortEnabled} />
