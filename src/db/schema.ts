@@ -41,6 +41,13 @@ export const splitMode = pgEnum("split_mode", [
   "custom",
 ]);
 
+export const goalScope = pgEnum("goal_scope", ["personal", "shared"]);
+export const goalStatus = pgEnum("goal_status", [
+  "active",
+  "reached",
+  "archived",
+]);
+
 export const memberRole = pgEnum("member_role", ["owner", "member"]);
 
 export const invitationStatus = pgEnum("invitation_status", [
@@ -100,8 +107,49 @@ export const teams = pgTable("teams", {
     .default(["ARS", "USD"]),
   fxReference: text("fx_reference").notNull().default("blue"),
   effortEnabled: boolean("effort_enabled").notNull().default(false),
+  goalsEnabled: boolean("goals_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ─── Objetivos de ahorro ───────────────────────────────
+export const goals = pgTable("goals", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  teamId: uuid("team_id")
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  emoji: text("emoji").notNull().default("🎯"),
+  targetCents: integer("target_cents").notNull(),
+  currency: text("currency").notNull().default("ARS"),
+  scope: goalScope("scope").notNull().default("shared"),
+  ownerUserId: uuid("owner_user_id").references(() => users.id, {
+    onDelete: "cascade",
+  }),
+  targetDate: date("target_date"),
+  status: goalStatus("status").notNull().default("active"),
+  createdByUserId: uuid("created_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const goalContributions = pgTable(
+  "goal_contributions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    goalId: uuid("goal_id")
+      .notNull()
+      .references(() => goals.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    amountCents: integer("amount_cents").notNull(),
+    note: text("note"),
+    contributedOn: date("contributed_on").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("goal_contributions_goal_idx").on(t.goalId)],
+);
 
 // ─── Cotizaciones (cache diario) ───────────────────────
 export const exchangeRates = pgTable(
@@ -324,6 +372,8 @@ export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
 export type Settlement = typeof settlements.$inferSelect;
 export type SplitMode = (typeof splitMode.enumValues)[number];
+export type Goal = typeof goals.$inferSelect;
+export type GoalContribution = typeof goalContributions.$inferSelect;
 export type PaymentMethod = (typeof paymentMethod.enumValues)[number];
 export type IncomeMethod = (typeof incomeMethod.enumValues)[number];
 export type CategoryKind = (typeof categoryKind.enumValues)[number];

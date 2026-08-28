@@ -36,6 +36,7 @@ import {
   renameTeam,
   revokeInvitation,
   setEffortEnabled,
+  setGoalsEnabled,
   updateTeamCurrencies,
 } from "@/lib/actions/team";
 import { linkTelegram, unlinkTelegram } from "@/lib/actions/telegram";
@@ -93,6 +94,7 @@ export function TeamManager({
   telegramLinked,
   currency,
   effortEnabled,
+  goalsEnabled,
 }: {
   isOwner: boolean;
   currentUserId: string;
@@ -102,6 +104,7 @@ export function TeamManager({
   telegramLinked: boolean;
   currency: CurrencySettings;
   effortEnabled: boolean;
+  goalsEnabled: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -450,6 +453,9 @@ export function TeamManager({
       {/* ── Calculadora de esfuerzo ── */}
       <EffortSection isOwner={isOwner} enabled={effortEnabled} />
 
+      {/* ── Objetivos ── */}
+      <GoalsSection isOwner={isOwner} enabled={goalsEnabled} />
+
       {/* ── Monedas ── */}
       <CurrencySection isOwner={isOwner} settings={currency} />
 
@@ -605,6 +611,73 @@ function EffortSection({
         ) : (
           <Tag tone={enabled ? "accent" : "muted"}>
             {enabled ? "Activa" : "Off"}
+          </Tag>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function GoalsSection({
+  isOwner,
+  enabled,
+}: {
+  isOwner: boolean;
+  enabled: boolean;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  function toggle() {
+    startTransition(async () => {
+      const r = await setGoalsEnabled(!enabled);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success(!enabled ? "Activados" : "Desactivados");
+      router.refresh();
+    });
+  }
+
+  return (
+    <section className="cosmic-panel rounded-2xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Objetivos</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Metas de ahorro para algo puntual (un viaje, un cambio de auto).
+            Se crea un objetivo con un monto y cada tanto se cargan aportes. La
+            app muestra el progreso y a qué ritmo vas. Los aportes son solo un
+            registro del objetivo: no tocan tus gastos ni el balance del equipo.
+          </p>
+          {isOwner && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Si los activás, aparece <b>Objetivos</b> en la barra de abajo.
+            </p>
+          )}
+        </div>
+        {isOwner ? (
+          <button
+            type="button"
+            aria-pressed={enabled}
+            disabled={pending}
+            onClick={toggle}
+            className={cn(
+              "relative h-[24px] w-11 shrink-0 rounded-full transition-colors",
+              enabled ? "bg-primary" : "bg-muted",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 left-0.5 size-5 rounded-full bg-white transition-transform",
+                enabled && "translate-x-[18px]",
+              )}
+            />
+          </button>
+        ) : (
+          <Tag tone={enabled ? "accent" : "muted"}>
+            {enabled ? "Activos" : "Off"}
           </Tag>
         )}
       </div>

@@ -12,6 +12,7 @@ import {
   LogOut,
   Check,
   Scale,
+  Target,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ type Props = {
     name: string;
     role: "owner" | "member";
     effortEnabled: boolean;
+    goalsEnabled: boolean;
   };
   teams: { id: string; name: string }[];
   children: React.ReactNode;
@@ -51,6 +53,12 @@ const BASE_NAV = [
   { href: "/analytics", label: "Análisis", icon: ChartColumn },
   { href: "/", label: "Inicio", icon: Home },
   {
+    href: "/objetivos",
+    label: "Objetivos",
+    icon: Target,
+    goalsOnly: true,
+  },
+  {
     href: "/esfuerzo",
     label: "Esfuerzo",
     icon: Scale,
@@ -61,7 +69,11 @@ const BASE_NAV = [
 ];
 
 export function AppShell({ user, team, teams, children }: Props) {
-  const NAV = BASE_NAV.filter((n) => !n.effortOnly || team.effortEnabled);
+  const NAV = BASE_NAV.filter(
+    (n) =>
+      (!n.effortOnly || team.effortEnabled) &&
+      (!n.goalsOnly || team.goalsEnabled),
+  );
   const pathname = usePathname();
   const router = useRouter();
   const [, startTransition] = useTransition();

@@ -21,6 +21,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         name: team.name,
         role: team.role,
         effortEnabled: team.effortEnabled,
+        goalsEnabled: team.goalsEnabled,
       }}
       teams={teamsList.map((t) => ({ id: t.id, name: t.name }))}
     >

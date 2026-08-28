@@ -18,11 +18,12 @@ import {
 import { MonthPicker } from "@/components/month-picker";
 import { CurrencyTabs } from "@/components/currency-tabs";
 import { getTeamBalance } from "@/lib/balance";
+import { getTopGoal } from "@/lib/goals";
 
 export default async function DashboardPage({
   searchParams,
 }: PageProps<"/">) {
-  const { team } = await requireTeam();
+  const { user, team } = await requireTeam();
   const sp = await searchParams;
   const month = typeof sp.month === "string" ? sp.month : currentMonth();
 
@@ -36,11 +37,12 @@ export default async function DashboardPage({
       : currencies[0];
   const fm = (c: number) => formatMoney(c, cur);
 
-  const [data, recent, recentIncomes, balance] = await Promise.all([
+  const [data, recent, recentIncomes, balance, topGoal] = await Promise.all([
     getMonthlyDashboard(team.id, month, cur),
     listExpenses(team.id, { month, currency: cur }),
     listIncomes(team.id, { month, currency: cur }),
     team.effortEnabled ? getTeamBalance(team.id, cur) : Promise.resolve(null),
+    team.goalsEnabled ? getTopGoal(team.id, user.id) : Promise.resolve(null),
   ]);
 
   const positive = data.balanceCents >= 0;
@@ -151,6 +153,41 @@ export default async function DashboardPage({
             </p>
           </div>
           <span className="shrink-0 text-primary">→</span>
+        </Link>
+      )}
+
+      {topGoal && (
+        <Link
+          href={`/objetivos/${topGoal.id}`}
+          className="block rounded-xl border bg-card/40 px-4 py-3"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="text-lg" aria-hidden>
+              {topGoal.emoji}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">
+                Objetivo
+              </p>
+              <p className="truncate text-sm font-medium">{topGoal.name}</p>
+            </div>
+            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+              {Math.min(100, Math.round(topGoal.pct))}%
+            </span>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border">
+            <span
+              className="block h-full rounded-full"
+              style={{
+                width: `${Math.min(100, Math.round(topGoal.pct))}%`,
+                background: topGoal.reached ? "#10b981" : "var(--primary)",
+              }}
+            />
+          </div>
+          <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+            {formatMoney(topGoal.savedCents, topGoal.currency)} de{" "}
+            {formatMoney(topGoal.targetCents, topGoal.currency)}
+          </p>
         </Link>
       )}
 

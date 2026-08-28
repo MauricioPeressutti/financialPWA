@@ -132,6 +132,24 @@ export async function setEffortEnabled(
   return { ok: true };
 }
 
+export async function setGoalsEnabled(
+  enabled: boolean,
+): Promise<ActionResult> {
+  const { user, team } = await requireTeam();
+  const role = await assertMembership(user.id, team.id);
+  if (role !== "owner")
+    return { ok: false, error: "Solo el owner puede cambiar esto" };
+
+  await db
+    .update(teams)
+    .set({ goalsEnabled: enabled })
+    .where(eq(teams.id, team.id));
+
+  revalidatePath("/", "layout");
+  revalidatePath("/team");
+  return { ok: true };
+}
+
 export async function renameTeam(name: string): Promise<ActionResult> {
   const { user, team } = await requireTeam();
   const role = await assertMembership(user.id, team.id);
