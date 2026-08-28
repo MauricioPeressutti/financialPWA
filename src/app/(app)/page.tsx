@@ -40,7 +40,7 @@ export default async function DashboardPage({
     getMonthlyDashboard(team.id, month, cur),
     listExpenses(team.id, { month, currency: cur }),
     listIncomes(team.id, { month, currency: cur }),
-    getTeamBalance(team.id, cur),
+    team.effortEnabled ? getTeamBalance(team.id, cur) : Promise.resolve(null),
   ]);
 
   const positive = data.balanceCents >= 0;
@@ -134,7 +134,7 @@ export default async function DashboardPage({
         </Card>
       </div>
 
-      {balance.suggestion && (
+      {balance?.suggestion && (
         <Link
           href="/esfuerzo"
           className="flex items-center justify-between gap-3 rounded-xl border bg-card/40 px-4 py-3"

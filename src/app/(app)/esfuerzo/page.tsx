@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { CurrencyTabs } from "@/components/currency-tabs";
 import { IncomeRow } from "@/components/effort/income-row";
@@ -23,6 +24,7 @@ export default async function EsfuerzoPage({
   searchParams,
 }: PageProps<"/esfuerzo">) {
   const { user, team } = await requireTeam();
+  if (!team.effortEnabled) redirect("/team");
   const sp = await searchParams;
 
   const [members, teamCurrencies] = await Promise.all([

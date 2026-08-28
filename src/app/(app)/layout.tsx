@@ -16,7 +16,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <AppShell
       user={{ name: user.displayName, email: user.email, photoUrl: user.photoUrl }}
-      team={{ id: team.id, name: team.name, role: team.role }}
+      team={{
+        id: team.id,
+        name: team.name,
+        role: team.role,
+        effortEnabled: team.effortEnabled,
+      }}
       teams={teamsList.map((t) => ({ id: t.id, name: t.name }))}
     >
       {children}

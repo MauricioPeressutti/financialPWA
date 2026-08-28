@@ -26,6 +26,7 @@ export default async function TeamPage() {
         currentUserId={user.id}
         team={{ name: team.name }}
         telegramLinked={telegram.linked}
+        effortEnabled={team.effortEnabled}
         currency={{
           primary: team.primaryCurrency,
           active: team.currencies,

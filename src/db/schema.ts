@@ -99,6 +99,7 @@ export const teams = pgTable("teams", {
     .$type<string[]>()
     .default(["ARS", "USD"]),
   fxReference: text("fx_reference").notNull().default("blue"),
+  effortEnabled: boolean("effort_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

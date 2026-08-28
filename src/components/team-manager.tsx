@@ -35,6 +35,7 @@ import {
   removeMember,
   renameTeam,
   revokeInvitation,
+  setEffortEnabled,
   updateTeamCurrencies,
 } from "@/lib/actions/team";
 import { linkTelegram, unlinkTelegram } from "@/lib/actions/telegram";
@@ -91,6 +92,7 @@ export function TeamManager({
   invites,
   telegramLinked,
   currency,
+  effortEnabled,
 }: {
   isOwner: boolean;
   currentUserId: string;
@@ -99,6 +101,7 @@ export function TeamManager({
   invites: Invite[];
   telegramLinked: boolean;
   currency: CurrencySettings;
+  effortEnabled: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -444,6 +447,9 @@ export function TeamManager({
         )}
       </section>
 
+      {/* ── Calculadora de esfuerzo ── */}
+      <EffortSection isOwner={isOwner} enabled={effortEnabled} />
+
       {/* ── Monedas ── */}
       <CurrencySection isOwner={isOwner} settings={currency} />
 
@@ -535,6 +541,74 @@ export function TeamManager({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function EffortSection({
+  isOwner,
+  enabled,
+}: {
+  isOwner: boolean;
+  enabled: boolean;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  function toggle() {
+    startTransition(async () => {
+      const r = await setEffortEnabled(!enabled);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success(!enabled ? "Activada" : "Desactivada");
+      router.refresh();
+    });
+  }
+
+  return (
+    <section className="cosmic-panel rounded-2xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold">Calculadora de esfuerzo</p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Reparte los gastos compartidos <b>según lo que gana cada uno</b>, no
+            por mitades. Cada persona carga su ingreso mensual y, al cargar un
+            gasto, un switch permite marcarlo como compartido y elegir quién
+            pagó. La app lleva el saldo (&ldquo;X le debe a Y&rdquo;) hasta que
+            lo saldan.
+          </p>
+          {isOwner && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Si la activás, aparece <b>Esfuerzo</b> en la barra de abajo.
+            </p>
+          )}
+        </div>
+        {isOwner ? (
+          <button
+            type="button"
+            aria-pressed={enabled}
+            disabled={pending}
+            onClick={toggle}
+            className={cn(
+              "relative h-[24px] w-11 shrink-0 rounded-full transition-colors",
+              enabled ? "bg-primary" : "bg-muted",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 left-0.5 size-5 rounded-full bg-white transition-transform",
+                enabled && "translate-x-[18px]",
+              )}
+            />
+          </button>
+        ) : (
+          <Tag tone={enabled ? "accent" : "muted"}>
+            {enabled ? "Activa" : "Off"}
+          </Tag>
+        )}
+      </div>
+    </section>
   );
 }
 

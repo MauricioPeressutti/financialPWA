@@ -64,6 +64,13 @@
       "when": 1787925267125,
       "tag": "0008_calculadora_esfuerzo",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787926193261,
+      "tag": "0009_effort_toggle",
+      "breakpoints": true
     }
   ]
 }

@@ -40,6 +40,7 @@ type Props = {
   usdArsRate: number | null;
   fxReferenceLabel: string;
   members: SplitMember[];
+  effortEnabled: boolean;
   expense?: {
     id: string;
     amount: string;
@@ -62,6 +63,7 @@ export function ExpenseForm({
   usdArsRate,
   fxReferenceLabel,
   members,
+  effortEnabled,
   expense,
 }: Props) {
   const router = useRouter();
@@ -228,11 +230,13 @@ export function ExpenseForm({
         <Textarea id="description" rows={2} {...form.register("description")} />
       </div>
 
-      <SplitFields
-        form={form}
-        members={members}
-        currency={form.watch("currency") || primaryCurrency}
-      />
+      {effortEnabled && (
+        <SplitFields
+          form={form}
+          members={members}
+          currency={form.watch("currency") || primaryCurrency}
+        />
+      )}
 
       {!expense && (
         <div className="space-y-1.5 rounded-lg border border-dashed p-3">

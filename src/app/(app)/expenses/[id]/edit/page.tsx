@@ -28,6 +28,7 @@ export default async function EditExpensePage({
         currencies={fx.currencies}
         usdArsRate={fx.usdArsRate}
         fxReferenceLabel={fx.fxReferenceLabel}
+        effortEnabled={team.effortEnabled}
         members={members.map((m) => ({
           userId: m.userId,
           name: m.name,

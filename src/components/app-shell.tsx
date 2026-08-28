@@ -31,12 +31,17 @@ import { cn } from "@/lib/utils";
 
 type Props = {
   user: { name: string | null; email: string; photoUrl: string | null };
-  team: { id: string; name: string; role: "owner" | "member" };
+  team: {
+    id: string;
+    name: string;
+    role: "owner" | "member";
+    effortEnabled: boolean;
+  };
   teams: { id: string; name: string }[];
   children: React.ReactNode;
 };
 
-const NAV = [
+const BASE_NAV = [
   {
     href: "/movimientos",
     label: "Movimientos",
@@ -45,11 +50,18 @@ const NAV = [
   },
   { href: "/analytics", label: "Análisis", icon: ChartColumn },
   { href: "/", label: "Inicio", icon: Home },
+  {
+    href: "/esfuerzo",
+    label: "Esfuerzo",
+    icon: Scale,
+    effortOnly: true,
+  },
   { href: "/categories", label: "Categorías", icon: Tags },
   { href: "/team", label: "Equipo", icon: Users },
 ];
 
 export function AppShell({ user, team, teams, children }: Props) {
+  const NAV = BASE_NAV.filter((n) => !n.effortOnly || team.effortEnabled);
   const pathname = usePathname();
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -112,11 +124,6 @@ export function AppShell({ user, team, teams, children }: Props) {
                 </DropdownMenuGroup>
               </>
             )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/esfuerzo")}>
-              <Scale className="size-4" />
-              Calculadora de esfuerzo
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut}>
               <LogOut className="size-4" />
