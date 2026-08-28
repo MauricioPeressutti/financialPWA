@@ -326,9 +326,11 @@ export async function getTeamMembers(teamId: string) {
       photoUrl: users.photoUrl,
       role: teamMembers.role,
       joinedAt: teamMembers.createdAt,
+      telegramLinked: sql<boolean>`${telegramLinks.linkedAt} is not null`,
     })
     .from(teamMembers)
     .innerJoin(users, eq(users.id, teamMembers.userId))
+    .leftJoin(telegramLinks, eq(telegramLinks.userId, users.id))
     .where(eq(teamMembers.teamId, teamId))
     .orderBy(teamMembers.createdAt);
 }

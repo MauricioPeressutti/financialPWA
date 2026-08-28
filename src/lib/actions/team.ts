@@ -55,6 +55,21 @@ export async function revokeInvitation(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+export async function leaveTeam(): Promise<ActionResult> {
+  const { user, team } = await requireTeam();
+  if (team.ownerUserId === user.id)
+    return { ok: false, error: "El owner no puede salir del equipo" };
+
+  await db
+    .delete(teamMembers)
+    .where(and(eq(teamMembers.teamId, team.id), eq(teamMembers.userId, user.id)));
+
+  const store = await cookies();
+  store.delete(ACTIVE_TEAM_COOKIE);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function removeMember(userId: string): Promise<ActionResult> {
   const { user, team } = await requireTeam();
   const role = await assertMembership(user.id, team.id);

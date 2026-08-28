@@ -28,7 +28,9 @@ export default async function TeamPage() {
           userId: m.userId,
           name: m.displayName,
           email: m.email,
+          photoUrl: m.photoUrl,
           role: m.role,
+          telegramLinked: m.telegramLinked,
         }))}
         invites={invites.map((i) => ({
           id: i.id,
