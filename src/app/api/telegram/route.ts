@@ -108,25 +108,26 @@ function renderMovement(a: {
   const meta = (
     income ? incomeMethodMeta : paymentMethodMeta
   ) as Record<string, { label: string }>;
-  const conf =
-    a.confidence === "media" || a.confidence === "baja"
-      ? "⚠️"
-      : a.method
+  const lowConf = a.confidence === "media" || a.confidence === "baja";
+  const icon = lowConf
+    ? "⚠️"
+    : !a.method
+      ? "🟡"
+      : income
         ? "✅"
-        : "🟡";
+        : "🔻";
   const methodPart = a.method
     ? ` · ${meta[a.method].label}`
     : " · <i>¿con qué?</i>";
 
   const lines = [
-    `${conf} ${income ? "💰 " : ""}<b>${income ? "+" : ""}${formatCents(a.amountCents)}</b> · ${a.catName}${a.subName ? ` · ${a.subName}` : ""}${methodPart}`,
+    `${icon} <b>${income ? "+" : "−"}${formatCents(a.amountCents)}</b> · ${a.catName}${a.subName ? ` · ${a.subName}` : ""}${methodPart}`,
   ];
   if (a.reimbursedCents)
     lines.push(`↩️ reintegro ${formatCents(a.reimbursedCents)}`);
   if (a.description) lines.push(`<i>${a.description}</i>`);
   if (a.on !== today()) lines.push(`📅 ${a.on}`);
-  if ((a.confidence === "media" || a.confidence === "baja") && a.note)
-    lines.push(`\n<i>${a.note}</i>`);
+  if (lowConf && a.note) lines.push(`\n<i>${a.note}</i>`);
 
   const kb: Btn[][] = [];
   if (!a.method) {
