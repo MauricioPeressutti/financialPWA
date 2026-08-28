@@ -75,11 +75,31 @@ export async function getAllCategories(teamId: string) {
   }));
 }
 
+/** Monedas en las que el equipo tiene movimientos, la más usada primero. */
+export async function getTeamCurrencies(teamId: string): Promise<string[]> {
+  const rows = await db
+    .select({
+      currency: sql<string>`c`,
+      n: sql<number>`count(*)`,
+    })
+    .from(
+      sql`(
+        select ${expenses.currency} as c from ${expenses} where ${expenses.teamId} = ${teamId}
+        union all
+        select ${incomes.currency} as c from ${incomes} where ${incomes.teamId} = ${teamId}
+      ) t`,
+    )
+    .groupBy(sql`c`)
+    .orderBy(sql`count(*) desc`);
+  return rows.map((r) => r.currency);
+}
+
 export type ExpenseFilters = {
   month?: string;
   from?: string;
   to?: string;
   categoryId?: string;
+  currency?: string;
   paymentMethod?: PaymentMethod;
 };
 
@@ -93,6 +113,7 @@ export async function listExpenses(teamId: string, filters: ExpenseFilters = {})
   if (filters.from) conds.push(gte(expenses.spentOn, filters.from));
   if (filters.to) conds.push(lte(expenses.spentOn, filters.to));
   if (filters.categoryId) conds.push(eq(expenses.categoryId, filters.categoryId));
+  if (filters.currency) conds.push(eq(expenses.currency, filters.currency));
   if (filters.paymentMethod) conds.push(eq(expenses.paymentMethod, filters.paymentMethod));
 
   const reimbSum = sql<number>`coalesce((
@@ -170,6 +191,7 @@ export type IncomeFilters = {
   from?: string;
   to?: string;
   categoryId?: string;
+  currency?: string;
   method?: IncomeMethod;
 };
 
@@ -183,6 +205,7 @@ export async function listIncomes(teamId: string, filters: IncomeFilters = {}) {
   if (filters.from) conds.push(gte(incomes.receivedOn, filters.from));
   if (filters.to) conds.push(lte(incomes.receivedOn, filters.to));
   if (filters.categoryId) conds.push(eq(incomes.categoryId, filters.categoryId));
+  if (filters.currency) conds.push(eq(incomes.currency, filters.currency));
   if (filters.method) conds.push(eq(incomes.method, filters.method));
 
   return db
@@ -236,10 +259,15 @@ export async function getIncome(teamId: string, id: string) {
   return income ?? null;
 }
 
-export async function getMonthlyDashboard(teamId: string, month: string) {
+export async function getMonthlyDashboard(
+  teamId: string,
+  month: string,
+  currency: string,
+) {
   const { start, end } = monthRange(month);
   const inMonth = and(
     eq(expenses.teamId, teamId),
+    eq(expenses.currency, currency),
     gte(expenses.spentOn, start),
     lte(expenses.spentOn, end),
   );
@@ -248,19 +276,19 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
     .select({
       categoryId: categories.id,
       categoryName: categories.name,
-      totalCents: sql<number>`sum(${expenses.baseAmountCents})`,
+      totalCents: sql<number>`sum(${expenses.amountCents})`,
       count: sql<number>`count(*)`,
     })
     .from(expenses)
     .innerJoin(categories, eq(categories.id, expenses.categoryId))
     .where(inMonth)
     .groupBy(categories.id, categories.name)
-    .orderBy(sql`sum(${expenses.baseAmountCents}) desc`);
+    .orderBy(sql`sum(${expenses.amountCents}) desc`);
 
   const byMethod = await db
     .select({
       paymentMethod: expenses.paymentMethod,
-      totalCents: sql<number>`sum(${expenses.baseAmountCents})`,
+      totalCents: sql<number>`sum(${expenses.amountCents})`,
     })
     .from(expenses)
     .where(inMonth)
@@ -268,7 +296,7 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
 
   const [totals] = await db
     .select({
-      totalCents: sql<number>`coalesce(sum(${expenses.baseAmountCents}), 0)`,
+      totalCents: sql<number>`coalesce(sum(${expenses.amountCents}), 0)`,
       count: sql<number>`count(*)`,
     })
     .from(expenses)
@@ -276,12 +304,13 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
 
   const [refunds] = await db
     .select({
-      totalCents: sql<number>`coalesce(sum(${reimbursements.baseAmountCents}), 0)`,
+      totalCents: sql<number>`coalesce(sum(${reimbursements.amountCents}), 0)`,
     })
     .from(reimbursements)
     .where(
       and(
         eq(reimbursements.teamId, teamId),
+        eq(reimbursements.currency, currency),
         gte(reimbursements.reimbursedOn, start),
         lte(reimbursements.reimbursedOn, end),
       ),
@@ -289,13 +318,14 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
 
   const inMonthInc = and(
     eq(incomes.teamId, teamId),
+    eq(incomes.currency, currency),
     gte(incomes.receivedOn, start),
     lte(incomes.receivedOn, end),
   );
 
   const [incTotals] = await db
     .select({
-      totalCents: sql<number>`coalesce(sum(${incomes.baseAmountCents}), 0)`,
+      totalCents: sql<number>`coalesce(sum(${incomes.amountCents}), 0)`,
       count: sql<number>`count(*)`,
     })
     .from(incomes)
@@ -305,14 +335,14 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
     .select({
       categoryId: categories.id,
       categoryName: categories.name,
-      totalCents: sql<number>`sum(${incomes.baseAmountCents})`,
+      totalCents: sql<number>`sum(${incomes.amountCents})`,
       count: sql<number>`count(*)`,
     })
     .from(incomes)
     .innerJoin(categories, eq(categories.id, incomes.categoryId))
     .where(inMonthInc)
     .groupBy(categories.id, categories.name)
-    .orderBy(sql`sum(${incomes.baseAmountCents}) desc`);
+    .orderBy(sql`sum(${incomes.amountCents}) desc`);
 
   const grossCents = Number(totals?.totalCents ?? 0);
   const reimbursedCents = Number(refunds?.totalCents ?? 0);

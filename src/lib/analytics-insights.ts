@@ -1,6 +1,6 @@
 import "server-only";
 
-import { formatCents } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { paymentMethodLabels } from "@/lib/payment-methods";
 import type { Analytics, SpendPace } from "@/lib/analytics";
 
@@ -9,9 +9,14 @@ export type Insight = { emoji: string; text: string };
 const DOW_FULL = ["domingos", "lunes", "martes", "miércoles", "jueves", "viernes", "sábados"];
 
 /** Frases automáticas a partir de los datos ya calculados. */
-export function buildInsights(a: Analytics, pace: SpendPace): Insight[] {
+export function buildInsights(
+  a: Analytics,
+  pace: SpendPace,
+  currency = "ARS",
+): Insight[] {
   const out: Insight[] = [];
   const k = a.kpis;
+  const formatCents = (c: number) => formatMoney(c, currency);
 
   if (a.byCategory[0] && k.grossCents) {
     const c = a.byCategory[0];

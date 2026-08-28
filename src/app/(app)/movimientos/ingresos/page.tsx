@@ -3,11 +3,16 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { IncomeFilters } from "@/components/income-filters";
 import { MovimientosTabs } from "@/components/movimientos-tabs";
+import { CurrencyTabs } from "@/components/currency-tabs";
 import { requireTeam } from "@/lib/auth";
-import { formatCents, formatMoney } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { fmtDay, fmtTime } from "@/lib/datetime";
 import { IncomeMethodTag, type IncomeMethod } from "@/lib/income-methods";
-import { getActiveCategories, listIncomes } from "@/lib/queries";
+import {
+  getActiveCategories,
+  getTeamCurrencies,
+  listIncomes,
+} from "@/lib/queries";
 
 export default async function IngresosPage({
   searchParams,
@@ -18,10 +23,20 @@ export default async function IngresosPage({
   const str = (v: string | string[] | undefined) =>
     typeof v === "string" && v ? v : undefined;
 
+  const teamCurrencies = await getTeamCurrencies(team.id);
+  const currencies = teamCurrencies.length
+    ? teamCurrencies
+    : [team.primaryCurrency];
+  const cur = str(sp.cur) && currencies.includes(sp.cur as string)
+    ? (sp.cur as string)
+    : currencies[0];
+  const fm = (c: number) => formatMoney(c, cur);
+
   const filters = {
     from: str(sp.from),
     to: str(sp.to),
     categoryId: str(sp.categoryId),
+    currency: cur,
     method: str(sp.method) as IncomeMethod | undefined,
   };
 
@@ -30,8 +45,7 @@ export default async function IngresosPage({
     listIncomes(team.id, filters),
   ]);
 
-  const primary = team.primaryCurrency;
-  const total = rows.reduce((a, r) => a + r.baseAmountCents, 0);
+  const total = rows.reduce((a, r) => a + r.amountCents, 0);
 
   return (
     <div className="space-y-4">
@@ -41,6 +55,7 @@ export default async function IngresosPage({
       </div>
 
       <MovimientosTabs />
+      <CurrencyTabs currencies={currencies} value={cur} />
 
       <IncomeFilters
         categories={categories.map((c) => ({ id: c.id, name: c.name }))}
@@ -48,7 +63,7 @@ export default async function IngresosPage({
 
       <div className="flex justify-between rounded-lg bg-muted px-3 py-2 text-sm">
         <span>{rows.length} ingresos</span>
-        <span className="font-medium text-emerald-600">{formatCents(total)}</span>
+        <span className="font-medium text-emerald-600">{fm(total)}</span>
       </div>
 
       <div className="divide-y">
@@ -72,16 +87,9 @@ export default async function IngresosPage({
                 {e.description ? <span>· {e.description}</span> : null}
               </p>
             </div>
-            <div className="shrink-0 text-right">
-              <p className="font-medium text-emerald-600">
-                {formatMoney(e.amountCents, e.currency)}
-              </p>
-              {e.currency !== primary && (
-                <p className="text-xs text-muted-foreground">
-                  ≈ {formatCents(e.baseAmountCents)}
-                </p>
-              )}
-            </div>
+            <p className="shrink-0 font-medium text-emerald-600">
+              {formatMoney(e.amountCents, e.currency)}
+            </p>
           </Link>
         ))}
         {rows.length === 0 && (

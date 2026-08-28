@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-import { formatCents } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 
 type Day = { date: string; cents: number; count: number };
 
@@ -10,7 +10,16 @@ const HEAT = ["--heat-0", "--heat-1", "--heat-2", "--heat-3", "--heat-4"];
 const MON = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 const MAX_WEEKS = 26;
 
-export function SpendHeatmap({ days, to }: { days: Day[]; to: string }) {
+export function SpendHeatmap({
+  days,
+  to,
+  currency = "ARS",
+}: {
+  days: Day[];
+  to: string;
+  currency?: string;
+}) {
+  const formatCents = (c: number) => formatMoney(c, currency);
   const [tip, setTip] = useState<{ x: number; y: number; t: string; r: string } | null>(null);
 
   const { cells, weeks, levels } = useMemo(() => {

@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 
-import { formatCents } from "@/lib/money";
+import { currencyMeta, type Currency } from "@/lib/currencies";
+import { formatMoney } from "@/lib/money";
 
 type Slice = {
   name: string;
@@ -13,20 +14,24 @@ type Slice = {
 };
 
 const catVar = (i: number) => `var(--cat-${((i % 6) + 6) % 6})`;
-const compact = (c: number) => {
-  const a = Math.abs(c) / 100;
-  if (a >= 1e6) return "$" + (a / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(".0", "") + "M";
-  if (a >= 1e3) return "$" + Math.round(a / 1e3) + "k";
-  return formatCents(c);
-};
 
 export function CategoryDonut({
   slices,
   colors,
+  currency = "ARS",
 }: {
   slices: Slice[];
   colors: Record<string, number>;
+  currency?: string;
 }) {
+  const sym = currencyMeta[currency as Currency]?.symbol ?? "$";
+  const compact = (c: number) => {
+    const a = Math.abs(c) / 100;
+    if (a >= 1e6) return sym + (a / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(".0", "") + "M";
+    if (a >= 1e3) return sym + Math.round(a / 1e3) + "k";
+    return formatMoney(c, currency);
+  };
+  const formatCents = (c: number) => formatMoney(c, currency);
   const [active, setActive] = useState<string | null>(null);
   const [locked, setLocked] = useState<string | null>(null);
   const [table, setTable] = useState(false);

@@ -1,7 +1,14 @@
-import { formatCents } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import type { MonthlyTrend } from "@/lib/analytics";
 
-export function TrendDual({ data }: { data: MonthlyTrend }) {
+export function TrendDual({
+  data,
+  currency = "ARS",
+}: {
+  data: MonthlyTrend;
+  currency?: string;
+}) {
+  const formatCents = (c: number) => formatMoney(c, currency);
   const max = Math.max(1, ...data.flatMap((d) => [d.netCents, d.incomeCents]));
 
   return (

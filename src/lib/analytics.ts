@@ -43,6 +43,7 @@ export async function getAnalytics(
   teamId: string,
   from: string,
   to: string,
+  currency: string,
   memberId?: string,
 ) {
   const mE = memberId ? [eq(expenses.createdByUserId, memberId)] : [];
@@ -50,18 +51,21 @@ export async function getAnalytics(
 
   const inRange = and(
     eq(expenses.teamId, teamId),
+    eq(expenses.currency, currency),
     gte(expenses.spentOn, from),
     lte(expenses.spentOn, to),
     ...mE,
   );
   const refInRange = and(
     eq(reimbursements.teamId, teamId),
+    eq(reimbursements.currency, currency),
     gte(reimbursements.reimbursedOn, from),
     lte(reimbursements.reimbursedOn, to),
     ...mE,
   );
   const incInRange = and(
     eq(incomes.teamId, teamId),
+    eq(incomes.currency, currency),
     gte(incomes.receivedOn, from),
     lte(incomes.receivedOn, to),
     ...mI,
@@ -86,16 +90,16 @@ export async function getAnalytics(
   ] = await Promise.all([
     db
       .select({
-        gross: sql<number>`coalesce(sum(${expenses.baseAmountCents}), 0)`,
+        gross: sql<number>`coalesce(sum(${expenses.amountCents}), 0)`,
         count: sql<number>`count(*)`,
-        max: sql<number>`coalesce(max(${expenses.baseAmountCents}), 0)`,
+        max: sql<number>`coalesce(max(${expenses.amountCents}), 0)`,
         minDate: sql<string | null>`min(${expenses.spentOn})`,
       })
       .from(expenses)
       .where(inRange),
     db
       .select({
-        total: sql<number>`coalesce(sum(${reimbursements.baseAmountCents}), 0)`,
+        total: sql<number>`coalesce(sum(${reimbursements.amountCents}), 0)`,
         count: sql<number>`count(*)`,
       })
       .from(reimbursements)
@@ -103,7 +107,7 @@ export async function getAnalytics(
       .where(refInRange),
     db
       .select({
-        total: sql<number>`coalesce(sum(${incomes.baseAmountCents}), 0)`,
+        total: sql<number>`coalesce(sum(${incomes.amountCents}), 0)`,
         count: sql<number>`count(*)`,
       })
       .from(incomes)
@@ -112,18 +116,18 @@ export async function getAnalytics(
       .select({
         categoryId: categories.id,
         name: categories.name,
-        gross: sql<number>`sum(${expenses.baseAmountCents})`,
+        gross: sql<number>`sum(${expenses.amountCents})`,
         count: sql<number>`count(*)`,
       })
       .from(expenses)
       .innerJoin(categories, eq(categories.id, expenses.categoryId))
       .where(inRange)
       .groupBy(categories.id, categories.name)
-      .orderBy(desc(sql`sum(${expenses.baseAmountCents})`)),
+      .orderBy(desc(sql`sum(${expenses.amountCents})`)),
     db
       .select({
         categoryId: expenses.categoryId,
-        refunded: sql<number>`sum(${reimbursements.baseAmountCents})`,
+        refunded: sql<number>`sum(${reimbursements.amountCents})`,
       })
       .from(reimbursements)
       .innerJoin(expenses, eq(expenses.id, reimbursements.expenseId))
@@ -133,7 +137,7 @@ export async function getAnalytics(
       .select({
         name: subcategories.name,
         categoryName: categories.name,
-        gross: sql<number>`sum(${expenses.baseAmountCents})`,
+        gross: sql<number>`sum(${expenses.amountCents})`,
         count: sql<number>`count(*)`,
       })
       .from(expenses)
@@ -141,35 +145,35 @@ export async function getAnalytics(
       .innerJoin(categories, eq(categories.id, expenses.categoryId))
       .where(inRange)
       .groupBy(subcategories.id, subcategories.name, categories.name)
-      .orderBy(desc(sql`sum(${expenses.baseAmountCents})`))
+      .orderBy(desc(sql`sum(${expenses.amountCents})`))
       .limit(8),
     db
       .select({
         method: expenses.paymentMethod,
-        gross: sql<number>`sum(${expenses.baseAmountCents})`,
+        gross: sql<number>`sum(${expenses.amountCents})`,
         count: sql<number>`count(*)`,
       })
       .from(expenses)
       .where(inRange)
       .groupBy(expenses.paymentMethod)
-      .orderBy(desc(sql`sum(${expenses.baseAmountCents})`)),
+      .orderBy(desc(sql`sum(${expenses.amountCents})`)),
     db
       .select({
         userId: users.id,
         name: users.displayName,
         email: users.email,
-        gross: sql<number>`sum(${expenses.baseAmountCents})`,
+        gross: sql<number>`sum(${expenses.amountCents})`,
         count: sql<number>`count(*)`,
       })
       .from(expenses)
       .innerJoin(users, eq(users.id, expenses.createdByUserId))
       .where(inRange)
       .groupBy(users.id, users.displayName, users.email)
-      .orderBy(desc(sql`sum(${expenses.baseAmountCents})`)),
+      .orderBy(desc(sql`sum(${expenses.amountCents})`)),
     db
       .select({
         userId: expenses.createdByUserId,
-        refunded: sql<number>`sum(${reimbursements.baseAmountCents})`,
+        refunded: sql<number>`sum(${reimbursements.amountCents})`,
       })
       .from(reimbursements)
       .innerJoin(expenses, eq(expenses.id, reimbursements.expenseId))
@@ -179,7 +183,7 @@ export async function getAnalytics(
       .select({
         userId: expenses.createdByUserId,
         categoryName: categories.name,
-        gross: sql<number>`sum(${expenses.baseAmountCents})`,
+        gross: sql<number>`sum(${expenses.amountCents})`,
       })
       .from(expenses)
       .innerJoin(categories, eq(categories.id, expenses.categoryId))
@@ -188,7 +192,7 @@ export async function getAnalytics(
     db
       .select({
         d: expenses.spentOn,
-        gross: sql<number>`sum(${expenses.baseAmountCents})`,
+        gross: sql<number>`sum(${expenses.amountCents})`,
         count: sql<number>`count(*)`,
       })
       .from(expenses)
@@ -199,14 +203,13 @@ export async function getAnalytics(
         id: expenses.id,
         amountCents: expenses.amountCents,
         currency: expenses.currency,
-        baseAmountCents: expenses.baseAmountCents,
         paymentMethod: expenses.paymentMethod,
         spentOn: expenses.spentOn,
         categoryName: categories.name,
         subcategoryName: subcategories.name,
         createdBy: users.displayName,
         refunded: sql<number>`coalesce((
-          select sum(r.base_amount_cents) from reimbursements r where r.expense_id = ${expenses.id}
+          select sum(r.amount_cents) from reimbursements r where r.expense_id = ${expenses.id}
         ), 0)`,
       })
       .from(expenses)
@@ -214,14 +217,13 @@ export async function getAnalytics(
       .leftJoin(subcategories, eq(subcategories.id, expenses.subcategoryId))
       .innerJoin(users, eq(users.id, expenses.createdByUserId))
       .where(inRange)
-      .orderBy(desc(expenses.baseAmountCents))
+      .orderBy(desc(expenses.amountCents))
       .limit(10),
     db
       .select({
         id: incomes.id,
         amountCents: incomes.amountCents,
         currency: incomes.currency,
-        baseAmountCents: incomes.baseAmountCents,
         method: incomes.method,
         receivedOn: incomes.receivedOn,
         categoryName: categories.name,
@@ -233,31 +235,31 @@ export async function getAnalytics(
       .leftJoin(subcategories, eq(subcategories.id, incomes.subcategoryId))
       .innerJoin(users, eq(users.id, incomes.createdByUserId))
       .where(incInRange)
-      .orderBy(desc(incomes.baseAmountCents))
+      .orderBy(desc(incomes.amountCents))
       .limit(10),
     db
       .select({
         name: categories.name,
-        total: sql<number>`sum(${incomes.baseAmountCents})`,
+        total: sql<number>`sum(${incomes.amountCents})`,
         count: sql<number>`count(*)`,
       })
       .from(incomes)
       .innerJoin(categories, eq(categories.id, incomes.categoryId))
       .where(incInRange)
       .groupBy(categories.id, categories.name)
-      .orderBy(desc(sql`sum(${incomes.baseAmountCents})`)),
+      .orderBy(desc(sql`sum(${incomes.amountCents})`)),
     db
       .select({
         name: users.displayName,
         email: users.email,
-        total: sql<number>`sum(${incomes.baseAmountCents})`,
+        total: sql<number>`sum(${incomes.amountCents})`,
         count: sql<number>`count(*)`,
       })
       .from(incomes)
       .innerJoin(users, eq(users.id, incomes.createdByUserId))
       .where(incInRange)
       .groupBy(users.id, users.displayName, users.email)
-      .orderBy(desc(sql`sum(${incomes.baseAmountCents})`)),
+      .orderBy(desc(sql`sum(${incomes.amountCents})`)),
   ]);
 
   const grossCents = n(totalsRow[0]?.gross);
@@ -362,8 +364,7 @@ export async function getAnalytics(
       kind: "gasto" as const,
       amountCents: r.amountCents,
       currency: r.currency,
-      baseAmountCents: r.baseAmountCents,
-      netBaseCents: r.baseAmountCents - n(r.refunded),
+      netCents: r.amountCents - n(r.refunded),
       label: r.categoryName + (r.subcategoryName ? ` · ${r.subcategoryName}` : ""),
       method: r.paymentMethod as string,
       on: String(r.spentOn),
@@ -374,15 +375,14 @@ export async function getAnalytics(
       kind: "ingreso" as const,
       amountCents: r.amountCents,
       currency: r.currency,
-      baseAmountCents: r.baseAmountCents,
-      netBaseCents: r.baseAmountCents,
+      netCents: r.amountCents,
       label: r.categoryName + (r.subcategoryName ? ` · ${r.subcategoryName}` : ""),
       method: r.method as string,
       on: String(r.receivedOn),
       createdBy: r.createdBy,
     })),
   ]
-    .sort((a, b) => b.baseAmountCents - a.baseAmountCents)
+    .sort((a, b) => b.amountCents - a.amountCents)
     .slice(0, 8);
 
   const incomeBySource = incSourceRows.map((r) => ({
@@ -436,6 +436,7 @@ export type Analytics = Awaited<ReturnType<typeof getAnalytics>>;
 export async function getMonthlyTrend(
   teamId: string,
   months = 12,
+  currency = "ARS",
   memberId?: string,
 ) {
   const start = new Date();
@@ -449,27 +450,48 @@ export async function getMonthlyTrend(
     db
       .select({
         month: sql<string>`to_char(${expenses.spentOn}, 'YYYY-MM')`,
-        gross: sql<number>`sum(${expenses.baseAmountCents})`,
+        gross: sql<number>`sum(${expenses.amountCents})`,
       })
       .from(expenses)
-      .where(and(eq(expenses.teamId, teamId), gte(expenses.spentOn, from), ...mE))
+      .where(
+        and(
+          eq(expenses.teamId, teamId),
+          eq(expenses.currency, currency),
+          gte(expenses.spentOn, from),
+          ...mE,
+        ),
+      )
       .groupBy(sql`to_char(${expenses.spentOn}, 'YYYY-MM')`),
     db
       .select({
         month: sql<string>`to_char(${reimbursements.reimbursedOn}, 'YYYY-MM')`,
-        refunded: sql<number>`sum(${reimbursements.baseAmountCents})`,
+        refunded: sql<number>`sum(${reimbursements.amountCents})`,
       })
       .from(reimbursements)
       .innerJoin(expenses, eq(expenses.id, reimbursements.expenseId))
-      .where(and(eq(reimbursements.teamId, teamId), gte(reimbursements.reimbursedOn, from), ...mE))
+      .where(
+        and(
+          eq(reimbursements.teamId, teamId),
+          eq(reimbursements.currency, currency),
+          gte(reimbursements.reimbursedOn, from),
+          ...mE,
+        ),
+      )
       .groupBy(sql`to_char(${reimbursements.reimbursedOn}, 'YYYY-MM')`),
     db
       .select({
         month: sql<string>`to_char(${incomes.receivedOn}, 'YYYY-MM')`,
-        total: sql<number>`sum(${incomes.baseAmountCents})`,
+        total: sql<number>`sum(${incomes.amountCents})`,
       })
       .from(incomes)
-      .where(and(eq(incomes.teamId, teamId), gte(incomes.receivedOn, from), ...mI))
+      .where(
+        and(
+          eq(incomes.teamId, teamId),
+          eq(incomes.currency, currency),
+          gte(incomes.receivedOn, from),
+          ...mI,
+        ),
+      )
       .groupBy(sql`to_char(${incomes.receivedOn}, 'YYYY-MM')`),
   ]);
 
@@ -498,7 +520,11 @@ export type MonthlyTrend = Awaited<ReturnType<typeof getMonthlyTrend>>;
 
 // ─────────────────────────────────────────────────────────
 /** Ritmo del mes en curso vs el anterior (gasto neto acumulado por día). */
-export async function getSpendPace(teamId: string, memberId?: string) {
+export async function getSpendPace(
+  teamId: string,
+  currency = "ARS",
+  memberId?: string,
+) {
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth();
@@ -510,15 +536,29 @@ export async function getSpendPace(teamId: string, memberId?: string) {
 
   const [expRows, refRows] = await Promise.all([
     db
-      .select({ d: expenses.spentOn, amount: sql<number>`sum(${expenses.baseAmountCents})` })
+      .select({ d: expenses.spentOn, amount: sql<number>`sum(${expenses.amountCents})` })
       .from(expenses)
-      .where(and(eq(expenses.teamId, teamId), gte(expenses.spentOn, prevStart), ...mE))
+      .where(
+        and(
+          eq(expenses.teamId, teamId),
+          eq(expenses.currency, currency),
+          gte(expenses.spentOn, prevStart),
+          ...mE,
+        ),
+      )
       .groupBy(expenses.spentOn),
     db
-      .select({ d: reimbursements.reimbursedOn, amount: sql<number>`sum(${reimbursements.baseAmountCents})` })
+      .select({ d: reimbursements.reimbursedOn, amount: sql<number>`sum(${reimbursements.amountCents})` })
       .from(reimbursements)
       .innerJoin(expenses, eq(expenses.id, reimbursements.expenseId))
-      .where(and(eq(reimbursements.teamId, teamId), gte(reimbursements.reimbursedOn, prevStart), ...mE))
+      .where(
+        and(
+          eq(reimbursements.teamId, teamId),
+          eq(reimbursements.currency, currency),
+          gte(reimbursements.reimbursedOn, prevStart),
+          ...mE,
+        ),
+      )
       .groupBy(reimbursements.reimbursedOn),
   ]);
 

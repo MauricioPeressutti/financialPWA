@@ -8,6 +8,7 @@ export function BarRow({
   pct,
   meta,
   fill = "var(--primary)",
+  fmt = formatCents,
 }: {
   label: string;
   sublabel?: string;
@@ -15,6 +16,7 @@ export function BarRow({
   pct: number;
   meta?: string;
   fill?: string;
+  fmt?: (c: number) => string;
 }) {
   return (
     <div className="space-y-1 py-1.5">
@@ -26,7 +28,7 @@ export function BarRow({
           ) : null}
         </span>
         <span className="shrink-0 font-medium tabular-nums">
-          {formatCents(valueCents)}
+          {fmt(valueCents)}
         </span>
       </div>
       <div className="flex items-center gap-2">

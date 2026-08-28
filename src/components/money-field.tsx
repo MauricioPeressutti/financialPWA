@@ -106,7 +106,8 @@ export function MoneyField({
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Cotización de dolarapi.com. Editalo si compraste a otro valor.
+            Solo como referencia (no afecta los totales). De dolarapi.com — editalo
+            si compraste a otro valor.
           </p>
         </div>
       )}

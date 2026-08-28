@@ -1,11 +1,18 @@
-import { formatCents } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import type { SpendPace } from "@/lib/analytics";
 
 const W = 320;
 const H = 120;
 const P = 6;
 
-export function PaceChart({ pace }: { pace: SpendPace }) {
+export function PaceChart({
+  pace,
+  currency = "ARS",
+}: {
+  pace: SpendPace;
+  currency?: string;
+}) {
+  const formatCents = (c: number) => formatMoney(c, currency);
   const max = Math.max(1, pace.prevFullCents, pace.curTotalCents);
   const px = (i: number) => P + (i / (pace.daysInMonth - 1)) * (W - P * 2);
   const py = (v: number) => H - P - (v / max) * (H - P * 2);

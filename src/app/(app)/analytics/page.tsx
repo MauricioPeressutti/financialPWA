@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AnalyticsRange } from "@/components/analytics-range";
 import { AnalyticsMember } from "@/components/analytics-member";
+import { CurrencyTabs } from "@/components/currency-tabs";
 import { BarRow, WeekdayBars } from "@/components/analytics-bits";
 import { CategoryDonut } from "@/components/analytics/category-donut";
 import { SpendHeatmap } from "@/components/analytics/spend-heatmap";
@@ -18,10 +19,14 @@ import {
   type AnalyticsRange as Range,
 } from "@/lib/analytics";
 import { buildInsights } from "@/lib/analytics-insights";
-import { formatCents, formatMoney } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { IncomeMethodTag } from "@/lib/income-methods";
 import { PaymentMethodTag, paymentMethodLabels } from "@/lib/payment-methods";
-import { getActiveCategories, getTeamMembers } from "@/lib/queries";
+import {
+  getActiveCategories,
+  getTeamCurrencies,
+  getTeamMembers,
+} from "@/lib/queries";
 
 const RANGES: Range[] = ["1m", "3m", "6m", "1y", "all"];
 const GREEN = "#10b981";
@@ -81,23 +86,33 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
       : "3m";
   const { from, to } = resolveRange(range);
 
-  const members = await getTeamMembers(team.id);
+  const [members, teamCurrencies] = await Promise.all([
+    getTeamMembers(team.id),
+    getTeamCurrencies(team.id),
+  ]);
+  const currencies = teamCurrencies.length ? teamCurrencies : [team.primaryCurrency];
+  const cur =
+    typeof sp.cur === "string" && currencies.includes(sp.cur)
+      ? sp.cur
+      : currencies[0];
+
   const memberId =
     typeof sp.member === "string" && members.some((m) => m.userId === sp.member)
       ? sp.member
       : undefined;
 
   const [a, trend, pace, expenseCats] = await Promise.all([
-    getAnalytics(team.id, from, to, memberId),
-    getMonthlyTrend(team.id, 12, memberId),
-    getSpendPace(team.id, memberId),
+    getAnalytics(team.id, from, to, cur, memberId),
+    getMonthlyTrend(team.id, 12, cur, memberId),
+    getSpendPace(team.id, cur, memberId),
     getActiveCategories(team.id, "expense"),
   ]);
 
   const colors = buildCategoryColors(expenseCats.map((c) => c.name));
-  const insights = buildInsights(a, pace);
+  const insights = buildInsights(a, pace, cur);
   const k = a.kpis;
   const empty = k.count === 0 && k.incomeCount === 0;
+  const fm = (c: number) => formatMoney(c, cur);
 
   const balancePos = k.balanceCents >= 0;
 
@@ -106,6 +121,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
       <h1 className="text-xl font-semibold">Análisis</h1>
 
       <div className="space-y-2">
+        <CurrencyTabs currencies={currencies} value={cur} />
         <AnalyticsRange value={range} />
         {members.length > 1 && (
           <AnalyticsMember
@@ -136,11 +152,11 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                 }`}
               >
                 {balancePos ? "" : "−"}
-                {formatCents(Math.abs(k.balanceCents))}
+                {fm(Math.abs(k.balanceCents))}
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
-                <b className="text-foreground">{formatCents(k.incomeCents)}</b> ingresos ·{" "}
-                <b className="text-foreground">{formatCents(k.netCents)}</b> gastos netos
+                <b className="text-foreground">{fm(k.incomeCents)}</b> ingresos ·{" "}
+                <b className="text-foreground">{fm(k.netCents)}</b> gastos netos
               </p>
             </CardContent>
           </Card>
@@ -149,15 +165,15 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
           <div className="grid grid-cols-2 gap-2">
             <Kpi
               label="Gastado"
-              value={formatCents(k.netCents)}
-              sub={k.reimbursedCents ? `de ${formatCents(k.grossCents)} bruto` : undefined}
+              value={fm(k.netCents)}
+              sub={k.reimbursedCents ? `de ${fm(k.grossCents)} bruto` : undefined}
             />
-            <Kpi label="Ingresos" value={formatCents(k.incomeCents)} sub={`${k.incomeCount} mov.`} tone="pos" />
-            <Kpi label="Prom. por día" value={formatCents(k.avgPerDayCents)} sub={`${k.spanDays} días`} />
+            <Kpi label="Ingresos" value={fm(k.incomeCents)} sub={`${k.incomeCount} mov.`} tone="pos" />
+            <Kpi label="Prom. por día" value={fm(k.avgPerDayCents)} sub={`${k.spanDays} días`} />
             <Kpi
               label={`Proyección de ${pace.monthLabel}`}
-              value={formatCents(pace.projectionCents)}
-              sub={`hoy vas ${formatCents(pace.curTotalCents)}`}
+              value={fm(pace.projectionCents)}
+              sub={`hoy vas ${fm(pace.curTotalCents)}`}
             />
             <Kpi
               label={`Ritmo vs ${pace.prevMonthLabel}`}
@@ -165,11 +181,11 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
               sub="a igual día del mes"
               tone={Math.abs(pace.vsPrevPct) < 1 ? undefined : pace.vsPrevPct > 0 ? "neg" : "pos"}
             />
-            <Kpi label="Ticket promedio" value={formatCents(k.avgTicketCents)} sub={`${k.count} gastos`} />
-            <Kpi label="Gasto más grande" value={formatCents(k.maxExpenseCents)} />
+            <Kpi label="Ticket promedio" value={fm(k.avgTicketCents)} sub={`${k.count} gastos`} />
+            <Kpi label="Gasto más grande" value={fm(k.maxExpenseCents)} />
             <Kpi
               label="Día más caro"
-              value={k.maxDayCents ? formatCents(k.maxDayCents) : "—"}
+              value={k.maxDayCents ? fm(k.maxDayCents) : "—"}
               sub={
                 k.maxDayDate
                   ? new Date(k.maxDayDate + "T00:00:00").toLocaleDateString("es-AR", {
@@ -183,7 +199,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
             <Kpi
               label="Recupero"
               value={`${k.refundRatePct.toFixed(0)}%`}
-              sub={k.reimbursedCents ? formatCents(k.reimbursedCents) : "sin reintegros"}
+              sub={k.reimbursedCents ? fm(k.reimbursedCents) : "sin reintegros"}
               tone={k.reimbursedCents ? "pos" : undefined}
             />
           </div>
@@ -192,7 +208,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
             <Section title="En qué se va" hint="por categoría">
               <Card>
                 <CardContent className="pt-4">
-                  <CategoryDonut slices={a.byCategory} colors={colors} />
+                  <CategoryDonut slices={a.byCategory} colors={colors} currency={cur} />
                 </CardContent>
               </Card>
             </Section>
@@ -202,7 +218,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
             <Section title="Mapa de gasto diario">
               <Card>
                 <CardContent className="pt-4">
-                  <SpendHeatmap days={a.days} to={to} />
+                  <SpendHeatmap days={a.days} to={to} currency={cur} />
                 </CardContent>
               </Card>
             </Section>
@@ -211,7 +227,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
           <Section title="Ritmo del mes" hint="gasto acumulado">
             <Card>
               <CardContent className="pt-4">
-                <PaceChart pace={pace} />
+                <PaceChart pace={pace} currency={cur} />
               </CardContent>
             </Card>
           </Section>
@@ -219,7 +235,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
           <Section title="Gastos vs ingresos" hint="últimos 12 meses">
             <Card>
               <CardContent className="pt-2">
-                <TrendDual data={trend} />
+                <TrendDual data={trend} currency={cur} />
               </CardContent>
             </Card>
           </Section>
@@ -241,7 +257,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                     label={c.name}
                     valueCents={c.netCents}
                     pct={c.pct}
-                    meta={`${c.count} · ${formatCents(Math.round(c.grossCents / Math.max(c.count, 1)))}/mov`}
+                    fmt={fm}
+                    meta={`${c.count} · ${fm(Math.round(c.grossCents / Math.max(c.count, 1)))}/mov`}
                     fill={`var(--cat-${(colors[c.name] ?? 5) % 6})`}
                   />
                 ))}
@@ -259,6 +276,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                     sublabel={s.categoryName}
                     valueCents={s.grossCents}
                     pct={s.pct}
+                    fmt={fm}
                     meta={`${s.count}`}
                     fill={`var(--cat-${(colors[s.categoryName] ?? 5) % 6})`}
                   />
@@ -275,6 +293,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                   label={paymentMethodLabels[p.method] ?? p.method}
                   valueCents={p.grossCents}
                   pct={p.pct}
+                  fmt={fm}
                   meta={`${p.count}`}
                 />
               ))}
@@ -288,7 +307,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                   <div key={m.userId} className="space-y-1.5">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">{m.name}</span>
-                      <span className="font-semibold tabular-nums">{formatCents(m.netCents)}</span>
+                      <span className="font-semibold tabular-nums">{fm(m.netCents)}</span>
                     </div>
                     <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
                       {m.byCategory.map((c) => (
@@ -303,7 +322,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                     </div>
                     <p className="text-[0.68rem] text-muted-foreground tabular-nums">
                       {m.pct.toFixed(0)}% del total · {m.count} gastos ·{" "}
-                      {formatCents(m.avgTicketCents)}/gasto
+                      {fm(m.avgTicketCents)}/gasto
                     </p>
                   </div>
                 ))}
@@ -320,6 +339,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                     label={s.name}
                     valueCents={s.totalCents}
                     pct={s.pct}
+                    fmt={fm}
                     meta={`${s.count}`}
                     fill={GREEN}
                   />
@@ -333,6 +353,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                       label={m.name}
                       valueCents={m.totalCents}
                       pct={m.pct}
+                      fmt={fm}
                       meta={`${m.count}`}
                       fill={GREEN}
                     />
@@ -378,17 +399,10 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                         </p>
                       </div>
                       <span
-                        className={`shrink-0 text-right font-semibold tabular-nums ${pos ? "text-emerald-600" : ""}`}
+                        className={`shrink-0 font-semibold tabular-nums ${pos ? "text-emerald-600" : ""}`}
                       >
-                        <span className="block">
-                          {pos ? "+" : "−"}
-                          {formatMoney(m.amountCents, m.currency)}
-                        </span>
-                        {m.currency !== team.primaryCurrency && (
-                          <span className="block text-[0.66rem] font-normal text-muted-foreground">
-                            ≈ {formatCents(m.baseAmountCents)}
-                          </span>
-                        )}
+                        {pos ? "+" : "−"}
+                        {formatMoney(m.amountCents, m.currency)}
                       </span>
                     </Link>
                   );

@@ -4,17 +4,19 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireTeam } from "@/lib/auth";
-import { formatCents, formatMoney } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { fmtDay, fmtTime } from "@/lib/datetime";
 import { PaymentMethodTag } from "@/lib/payment-methods";
 import { IncomeMethodTag } from "@/lib/income-methods";
 import {
   currentMonth,
   getMonthlyDashboard,
+  getTeamCurrencies,
   listExpenses,
   listIncomes,
 } from "@/lib/queries";
 import { MonthPicker } from "@/components/month-picker";
+import { CurrencyTabs } from "@/components/currency-tabs";
 
 export default async function DashboardPage({
   searchParams,
@@ -23,15 +25,24 @@ export default async function DashboardPage({
   const sp = await searchParams;
   const month = typeof sp.month === "string" ? sp.month : currentMonth();
 
+  const teamCurrencies = await getTeamCurrencies(team.id);
+  const currencies = teamCurrencies.length
+    ? teamCurrencies
+    : [team.primaryCurrency];
+  const cur =
+    typeof sp.cur === "string" && currencies.includes(sp.cur)
+      ? sp.cur
+      : currencies[0];
+  const fm = (c: number) => formatMoney(c, cur);
+
   const [data, recent, recentIncomes] = await Promise.all([
-    getMonthlyDashboard(team.id, month),
-    listExpenses(team.id, { month }),
-    listIncomes(team.id, { month }),
+    getMonthlyDashboard(team.id, month, cur),
+    listExpenses(team.id, { month, currency: cur }),
+    listIncomes(team.id, { month, currency: cur }),
   ]);
 
   const positive = data.balanceCents >= 0;
 
-  const primary = team.primaryCurrency;
   type Mov = {
     key: string;
     kind: "gasto" | "ingreso";
@@ -42,7 +53,6 @@ export default async function DashboardPage({
     method: string;
     amountCents: number;
     currency: string;
-    baseAmountCents: number;
   };
   const movements: Mov[] = [
     ...recentIncomes.map((e) => ({
@@ -55,7 +65,6 @@ export default async function DashboardPage({
       method: e.method,
       amountCents: e.amountCents,
       currency: e.currency,
-      baseAmountCents: e.baseAmountCents,
     })),
     ...recent.map((e) => ({
       key: `e${e.id}`,
@@ -67,7 +76,6 @@ export default async function DashboardPage({
       method: e.paymentMethod,
       amountCents: e.amountCents,
       currency: e.currency,
-      baseAmountCents: e.baseAmountCents,
     })),
   ]
     .sort(
@@ -84,6 +92,8 @@ export default async function DashboardPage({
         <MonthPicker value={month} />
       </div>
 
+      <CurrencyTabs currencies={currencies} value={cur} />
+
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardHeader className="pb-1">
@@ -92,7 +102,7 @@ export default async function DashboardPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-lg font-semibold text-emerald-600">
-            {formatCents(data.incomeCents)}
+            {fm(data.incomeCents)}
           </CardContent>
         </Card>
         <Card>
@@ -102,7 +112,7 @@ export default async function DashboardPage({
             </CardTitle>
           </CardHeader>
           <CardContent className="text-lg font-semibold">
-            {formatCents(data.netCents)}
+            {fm(data.netCents)}
           </CardContent>
         </Card>
         <Card className="col-span-2">
@@ -117,7 +127,7 @@ export default async function DashboardPage({
             }`}
           >
             {positive ? "" : "−"}
-            {formatCents(Math.abs(data.balanceCents))}
+            {fm(Math.abs(data.balanceCents))}
           </CardContent>
         </Card>
       </div>
@@ -136,7 +146,7 @@ export default async function DashboardPage({
                 className="flex justify-between border-b py-1.5 text-sm"
               >
                 <span>{c.categoryName}</span>
-                <span className="font-medium">{formatCents(c.totalCents)}</span>
+                <span className="font-medium">{fm(c.totalCents)}</span>
               </div>
             ))}
           </div>
@@ -156,7 +166,7 @@ export default async function DashboardPage({
               >
                 <span>{c.categoryName}</span>
                 <span className="font-medium text-emerald-600">
-                  {formatCents(c.totalCents)}
+                  {fm(c.totalCents)}
                 </span>
               </div>
             ))}
@@ -212,19 +222,12 @@ export default async function DashboardPage({
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 text-right tabular-nums ${
+                  className={`shrink-0 font-medium tabular-nums ${
                     income ? "text-emerald-600" : ""
                   }`}
                 >
-                  <span className="block font-medium">
-                    {income ? "+" : "−"}
-                    {formatMoney(m.amountCents, m.currency)}
-                  </span>
-                  {m.currency !== primary && (
-                    <span className="block text-[0.66rem] font-normal text-muted-foreground">
-                      ≈ {formatCents(m.baseAmountCents)}
-                    </span>
-                  )}
+                  {income ? "+" : "−"}
+                  {formatMoney(m.amountCents, m.currency)}
                 </span>
               </Link>
             );

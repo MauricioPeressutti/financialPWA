@@ -3,11 +3,16 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ExpenseFilters } from "@/components/expense-filters";
 import { MovimientosTabs } from "@/components/movimientos-tabs";
+import { CurrencyTabs } from "@/components/currency-tabs";
 import { requireTeam } from "@/lib/auth";
-import { formatCents, formatMoney } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { fmtDay, fmtTime } from "@/lib/datetime";
 import { PaymentMethodTag, type PaymentMethod } from "@/lib/payment-methods";
-import { getActiveCategories, listExpenses } from "@/lib/queries";
+import {
+  getActiveCategories,
+  getTeamCurrencies,
+  listExpenses,
+} from "@/lib/queries";
 
 export default async function MovimientosPage({
   searchParams,
@@ -18,10 +23,20 @@ export default async function MovimientosPage({
   const str = (v: string | string[] | undefined) =>
     typeof v === "string" && v ? v : undefined;
 
+  const teamCurrencies = await getTeamCurrencies(team.id);
+  const currencies = teamCurrencies.length
+    ? teamCurrencies
+    : [team.primaryCurrency];
+  const cur = str(sp.cur) && currencies.includes(sp.cur as string)
+    ? (sp.cur as string)
+    : currencies[0];
+  const fm = (c: number) => formatMoney(c, cur);
+
   const filters = {
     from: str(sp.from),
     to: str(sp.to),
     categoryId: str(sp.categoryId),
+    currency: cur,
     paymentMethod: str(sp.paymentMethod) as PaymentMethod | undefined,
   };
 
@@ -30,10 +45,9 @@ export default async function MovimientosPage({
     listExpenses(team.id, filters),
   ]);
 
-  const primary = team.primaryCurrency;
-  const total = rows.reduce((a, r) => a + r.baseAmountCents, 0);
+  const total = rows.reduce((a, r) => a + r.amountCents, 0);
   const totalNet = rows.reduce(
-    (a, r) => a + r.baseAmountCents - Number(r.reimbursedBaseCents),
+    (a, r) => a + r.amountCents - Number(r.reimbursedCents),
     0,
   );
 
@@ -45,6 +59,7 @@ export default async function MovimientosPage({
       </div>
 
       <MovimientosTabs />
+      <CurrencyTabs currencies={currencies} value={cur} />
 
       <ExpenseFilters
         categories={categories.map((c) => ({ id: c.id, name: c.name }))}
@@ -52,14 +67,13 @@ export default async function MovimientosPage({
 
       <div className="flex justify-between rounded-lg bg-muted px-3 py-2 text-sm">
         <span>
-          {rows.length} gastos · {formatCents(total)}
+          {rows.length} gastos · {fm(total)}
         </span>
-        <span className="font-medium">Neto {formatCents(totalNet)}</span>
+        <span className="font-medium">Neto {fm(totalNet)}</span>
       </div>
 
       <div className="divide-y">
         {rows.map((e) => {
-          const foreign = e.currency !== primary;
           const net = e.amountCents - Number(e.reimbursedCents);
           return (
             <Link
@@ -85,11 +99,6 @@ export default async function MovimientosPage({
                 <p className="font-medium">
                   {formatMoney(e.amountCents, e.currency)}
                 </p>
-                {foreign && (
-                  <p className="text-xs text-muted-foreground">
-                    ≈ {formatCents(e.baseAmountCents)}
-                  </p>
-                )}
                 {Number(e.reimbursedCents) > 0 && (
                   <p className="text-xs text-emerald-600">
                     neto {formatMoney(net, e.currency)}
