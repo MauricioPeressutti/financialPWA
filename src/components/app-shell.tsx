@@ -11,6 +11,7 @@ import {
   Users,
   LogOut,
   Check,
+  Scale,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -111,6 +112,11 @@ export function AppShell({ user, team, teams, children }: Props) {
                 </DropdownMenuGroup>
               </>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/esfuerzo")}>
+              <Scale className="size-4" />
+              Calculadora de esfuerzo
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut}>
               <LogOut className="size-4" />

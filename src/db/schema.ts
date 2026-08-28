@@ -34,6 +34,13 @@ export const incomeMethod = pgEnum("income_method", [
 
 export const categoryKind = pgEnum("category_kind", ["expense", "income"]);
 
+export const splitMode = pgEnum("split_mode", [
+  "none",
+  "proportional",
+  "even",
+  "custom",
+]);
+
 export const memberRole = pgEnum("member_role", ["owner", "member"]);
 
 export const invitationStatus = pgEnum("invitation_status", [
@@ -128,6 +135,11 @@ export const teamMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: memberRole("role").notNull().default("member"),
+    // Calculadora de esfuerzo: ingreso mensual declarado por la persona.
+    declaredIncomeCents: integer("declared_income_cents").notNull().default(0),
+    declaredIncomeCurrency: text("declared_income_currency")
+      .notNull()
+      .default("ARS"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [primaryKey({ columns: [t.teamId, t.userId] })],
@@ -196,6 +208,9 @@ export const expenses = pgTable(
     paymentMethod: paymentMethod("payment_method").notNull(),
     description: text("description"),
     spentOn: date("spent_on").notNull(),
+    // Calculadora de esfuerzo
+    splitMode: splitMode("split_mode").notNull().default("none"),
+    paidByUserId: uuid("paid_by_user_id").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -204,6 +219,44 @@ export const expenses = pgTable(
     index("expenses_team_category_idx").on(t.teamId, t.categoryId),
   ],
 );
+
+// ─── Reparto de gastos compartidos ─────────────────────
+export const expenseSplits = pgTable(
+  "expense_splits",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    expenseId: uuid("expense_id")
+      .notNull()
+      .references(() => expenses.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    owedCents: integer("owed_cents").notNull(), // en la moneda del gasto
+  },
+  (t) => [uniqueIndex("expense_splits_expense_user_idx").on(t.expenseId, t.userId)],
+);
+
+// ─── Saldos entre personas (settle up) ─────────────────
+export const settlements = pgTable("settlements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  teamId: uuid("team_id")
+    .notNull()
+    .references(() => teams.id, { onDelete: "cascade" }),
+  fromUserId: uuid("from_user_id")
+    .notNull()
+    .references(() => users.id),
+  toUserId: uuid("to_user_id")
+    .notNull()
+    .references(() => users.id),
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").notNull().default("ARS"),
+  note: text("note"),
+  settledOn: date("settled_on").notNull(),
+  createdByUserId: uuid("created_by_user_id")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 // ─── Ingresos ──────────────────────────────────────────
 export const incomes = pgTable(
@@ -267,6 +320,9 @@ export type Expense = typeof expenses.$inferSelect;
 export type Income = typeof incomes.$inferSelect;
 export type Reimbursement = typeof reimbursements.$inferSelect;
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
+export type ExpenseSplit = typeof expenseSplits.$inferSelect;
+export type Settlement = typeof settlements.$inferSelect;
+export type SplitMode = (typeof splitMode.enumValues)[number];
 export type PaymentMethod = (typeof paymentMethod.enumValues)[number];
 export type IncomeMethod = (typeof incomeMethod.enumValues)[number];
 export type CategoryKind = (typeof categoryKind.enumValues)[number];

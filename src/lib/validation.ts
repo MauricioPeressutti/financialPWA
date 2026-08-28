@@ -19,6 +19,10 @@ export const expenseInput = z.object({
   // Reintegro inmediato opcional (ej: MODO devuelve al toque). Se anota
   // como reintegro del mismo gasto, con la fecha del gasto.
   reimbursedAmount: z.string().optional().or(z.literal("")),
+  // Calculadora de esfuerzo
+  splitMode: z.enum(["none", "proportional", "even", "custom"]),
+  paidByUserId: z.string().uuid().optional().or(z.literal("")),
+  splitCustom: z.string().optional().or(z.literal("")), // JSON { userId: pct }
 });
 export type ExpenseInput = z.infer<typeof expenseInput>;
 

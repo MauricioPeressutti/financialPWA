@@ -17,6 +17,7 @@ import {
 } from "@/lib/queries";
 import { MonthPicker } from "@/components/month-picker";
 import { CurrencyTabs } from "@/components/currency-tabs";
+import { getTeamBalance } from "@/lib/balance";
 
 export default async function DashboardPage({
   searchParams,
@@ -35,10 +36,11 @@ export default async function DashboardPage({
       : currencies[0];
   const fm = (c: number) => formatMoney(c, cur);
 
-  const [data, recent, recentIncomes] = await Promise.all([
+  const [data, recent, recentIncomes, balance] = await Promise.all([
     getMonthlyDashboard(team.id, month, cur),
     listExpenses(team.id, { month, currency: cur }),
     listIncomes(team.id, { month, currency: cur }),
+    getTeamBalance(team.id, cur),
   ]);
 
   const positive = data.balanceCents >= 0;
@@ -131,6 +133,26 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       </div>
+
+      {balance.suggestion && (
+        <Link
+          href="/esfuerzo"
+          className="flex items-center justify-between gap-3 rounded-xl border bg-card/40 px-4 py-3"
+        >
+          <div className="min-w-0">
+            <p className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">
+              Esfuerzo · cuentas del equipo
+            </p>
+            <p className="truncate text-sm font-medium">
+              {balance.suggestion.fromName} le debe a {balance.suggestion.toName}{" "}
+              <span className="tabular-nums">
+                {fm(balance.suggestion.amountCents)}
+              </span>
+            </p>
+          </div>
+          <span className="shrink-0 text-primary">→</span>
+        </Link>
+      )}
 
       <section className="space-y-2">
         <h2 className="text-sm font-medium text-muted-foreground">

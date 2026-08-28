@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { expenses, reimbursements } from "@/db/schema";
+import { expenseSplits, expenses, reimbursements, teamMembers } from "@/db/schema";
 import { requireTeam } from "@/lib/auth";
+import { splitShares, type SplitMode } from "@/lib/effort";
 import { insertExpense } from "@/lib/expenses-core";
 import { fxForMovement } from "@/lib/fx";
 import { parseAmountToCents } from "@/lib/money";
@@ -17,6 +18,50 @@ function revalidate() {
   revalidatePath("/");
   revalidatePath("/movimientos");
   revalidatePath("/analytics");
+  revalidatePath("/esfuerzo");
+}
+
+/** Calcula el reparto de un gasto compartido con los ingresos actuales del equipo. */
+async function resolveSplits(
+  teamId: string,
+  amountCents: number,
+  splitMode: SplitMode | "none",
+  paidByUserId: string,
+  splitCustomJson: string,
+): Promise<
+  | { ok: true; splits: { userId: string; owedCents: number }[]; paidBy: string | null }
+  | { ok: false; error: string }
+> {
+  if (splitMode === "none")
+    return { ok: true, splits: [], paidBy: null };
+
+  const members = await db
+    .select({
+      userId: teamMembers.userId,
+      incomeCents: teamMembers.declaredIncomeCents,
+    })
+    .from(teamMembers)
+    .where(eq(teamMembers.teamId, teamId));
+
+  if (members.length < 2)
+    return { ok: false, error: "El equipo necesita 2 personas para repartir." };
+  if (!members.some((m) => m.userId === paidByUserId))
+    return { ok: false, error: "Elegí quién pagó el gasto." };
+
+  let custom: Record<string, number> | undefined;
+  if (splitMode === "custom" && splitCustomJson) {
+    try {
+      custom = JSON.parse(splitCustomJson) as Record<string, number>;
+    } catch {
+      custom = undefined;
+    }
+  }
+
+  return {
+    ok: true,
+    splits: splitShares(amountCents, splitMode as SplitMode, members, custom),
+    paidBy: paidByUserId,
+  };
 }
 
 export async function createExpense(raw: unknown): Promise<ActionResult> {
@@ -34,6 +79,15 @@ export async function createExpense(raw: unknown): Promise<ActionResult> {
     ? parseAmountToCents(parsed.data.reimbursedAmount)
     : null;
 
+  const split = await resolveSplits(
+    team.id,
+    cents,
+    parsed.data.splitMode,
+    parsed.data.paidByUserId || "",
+    parsed.data.splitCustom || "",
+  );
+  if (!split.ok) return { ok: false, error: split.error };
+
   await insertExpense(team.id, user.id, {
     amountCents: cents,
     currency: parsed.data.currency,
@@ -44,6 +98,9 @@ export async function createExpense(raw: unknown): Promise<ActionResult> {
     description: parsed.data.description || null,
     spentOn: parsed.data.spentOn,
     reimbursedCents: refundCents,
+    splitMode: parsed.data.splitMode,
+    paidByUserId: split.paidBy,
+    splits: split.splits,
   });
 
   revalidate();
@@ -61,6 +118,15 @@ export async function updateExpense(id: string, raw: unknown): Promise<ActionRes
   const fx = await fxForMovement(team, parsed.data.currency, parsed.data.fxRate);
   if (fx.error) return { ok: false, error: fx.error };
 
+  const split = await resolveSplits(
+    team.id,
+    cents,
+    parsed.data.splitMode,
+    parsed.data.paidByUserId || "",
+    parsed.data.splitCustom || "",
+  );
+  if (!split.ok) return { ok: false, error: split.error };
+
   const updated = await db
     .update(expenses)
     .set({
@@ -73,12 +139,25 @@ export async function updateExpense(id: string, raw: unknown): Promise<ActionRes
       paymentMethod: parsed.data.paymentMethod,
       description: parsed.data.description || null,
       spentOn: parsed.data.spentOn,
+      splitMode: parsed.data.splitMode,
+      paidByUserId: split.paidBy,
       updatedAt: new Date(),
     })
     .where(and(eq(expenses.id, id), eq(expenses.teamId, team.id)))
     .returning({ id: expenses.id });
 
   if (updated.length === 0) return { ok: false, error: "Gasto no encontrado" };
+
+  await db.delete(expenseSplits).where(eq(expenseSplits.expenseId, id));
+  if (split.splits.length > 0) {
+    await db.insert(expenseSplits).values(
+      split.splits.map((s) => ({
+        expenseId: id,
+        userId: s.userId,
+        owedCents: s.owedCents,
+      })),
+    );
+  }
 
   revalidate();
   revalidatePath(`/expenses/${id}`);

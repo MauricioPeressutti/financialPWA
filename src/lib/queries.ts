@@ -162,6 +162,8 @@ export async function getExpense(teamId: string, id: string) {
       description: expenses.description,
       spentOn: expenses.spentOn,
       createdAt: expenses.createdAt,
+      splitMode: expenses.splitMode,
+      paidByUserId: expenses.paidByUserId,
       categoryId: expenses.categoryId,
       subcategoryId: expenses.subcategoryId,
       categoryName: categories.name,
@@ -384,6 +386,28 @@ export async function getTeamMembers(teamId: string) {
     .leftJoin(telegramLinks, eq(telegramLinks.userId, users.id))
     .where(eq(teamMembers.teamId, teamId))
     .orderBy(teamMembers.createdAt);
+}
+
+/** Miembros del equipo con su ingreso declarado (para la calculadora de esfuerzo). */
+export async function getSplitMembers(teamId: string) {
+  const rows = await db
+    .select({
+      userId: users.id,
+      name: users.displayName,
+      email: users.email,
+      incomeCents: teamMembers.declaredIncomeCents,
+      incomeCurrency: teamMembers.declaredIncomeCurrency,
+    })
+    .from(teamMembers)
+    .innerJoin(users, eq(users.id, teamMembers.userId))
+    .where(eq(teamMembers.teamId, teamId))
+    .orderBy(teamMembers.createdAt);
+  return rows.map((r) => ({
+    userId: r.userId,
+    name: r.name ?? r.email,
+    incomeCents: r.incomeCents,
+    incomeCurrency: r.incomeCurrency,
+  }));
 }
 
 export async function getTelegramLink(userId: string) {

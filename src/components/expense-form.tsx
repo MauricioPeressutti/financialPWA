@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MoneyField } from "@/components/money-field";
+import { SplitFields, type SplitMember } from "@/components/split-fields";
 import {
   Select,
   SelectContent,
@@ -38,6 +39,7 @@ type Props = {
   currencies: string[];
   usdArsRate: number | null;
   fxReferenceLabel: string;
+  members: SplitMember[];
   expense?: {
     id: string;
     amount: string;
@@ -48,6 +50,8 @@ type Props = {
     subcategoryId: string | null;
     paymentMethod: PaymentMethod;
     description: string | null;
+    splitMode: string;
+    paidByUserId: string | null;
   };
 };
 
@@ -57,6 +61,7 @@ export function ExpenseForm({
   currencies,
   usdArsRate,
   fxReferenceLabel,
+  members,
   expense,
 }: Props) {
   const router = useRouter();
@@ -76,6 +81,10 @@ export function ExpenseForm({
       paymentMethod: expense?.paymentMethod ?? "efectivo",
       description: expense?.description ?? "",
       reimbursedAmount: "",
+      splitMode:
+        (expense?.splitMode as ExpenseInput["splitMode"]) ?? "none",
+      paidByUserId: expense?.paidByUserId ?? "",
+      splitCustom: "",
     },
   });
 
@@ -218,6 +227,12 @@ export function ExpenseForm({
         <Label htmlFor="description">Descripción (opcional)</Label>
         <Textarea id="description" rows={2} {...form.register("description")} />
       </div>
+
+      <SplitFields
+        form={form}
+        members={members}
+        currency={form.watch("currency") || primaryCurrency}
+      />
 
       {!expense && (
         <div className="space-y-1.5 rounded-lg border border-dashed p-3">

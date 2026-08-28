@@ -3,9 +3,15 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { expenses, reimbursements, subcategories } from "@/db/schema";
+import {
+  expenseSplits,
+  expenses,
+  reimbursements,
+  subcategories,
+} from "@/db/schema";
 import { parseAmountToCents } from "@/lib/money";
 import type { PaymentMethod } from "@/lib/payment-methods";
+import type { SplitMode } from "@/lib/effort";
 
 export type NewExpense = {
   amountCents: number;
@@ -17,6 +23,10 @@ export type NewExpense = {
   description?: string | null;
   spentOn: string; // YYYY-MM-DD
   reimbursedCents?: number | null; // en la misma moneda que el gasto
+  // Calculadora de esfuerzo
+  splitMode?: SplitMode | "none";
+  paidByUserId?: string | null;
+  splits?: { userId: string; owedCents: number }[];
 };
 
 /**
@@ -42,6 +52,8 @@ export async function insertExpense(
   const fxRate = e.fxRate && e.fxRate > 0 ? e.fxRate : 1;
   const baseAmountCents = Math.round(e.amountCents * fxRate);
 
+  const splitMode = e.splitMode && e.splitMode !== "none" ? e.splitMode : "none";
+
   const [created] = await db
     .insert(expenses)
     .values({
@@ -56,8 +68,20 @@ export async function insertExpense(
       paymentMethod: e.paymentMethod,
       description: e.description || null,
       spentOn: e.spentOn,
+      splitMode,
+      paidByUserId: splitMode !== "none" ? e.paidByUserId || null : null,
     })
     .returning({ id: expenses.id });
+
+  if (splitMode !== "none" && e.splits && e.splits.length > 0) {
+    await db.insert(expenseSplits).values(
+      e.splits.map((s) => ({
+        expenseId: created.id,
+        userId: s.userId,
+        owedCents: s.owedCents,
+      })),
+    );
+  }
 
   if (e.reimbursedCents && e.reimbursedCents > 0) {
     await db.insert(reimbursements).values({
