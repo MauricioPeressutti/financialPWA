@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ExpenseFilters } from "@/components/expense-filters";
 import { MovimientosTabs } from "@/components/movimientos-tabs";
 import { requireTeam } from "@/lib/auth";
-import { formatCents } from "@/lib/money";
+import { formatCents, formatMoney } from "@/lib/money";
 import { fmtDay, fmtTime } from "@/lib/datetime";
 import { PaymentMethodTag, type PaymentMethod } from "@/lib/payment-methods";
 import { getActiveCategories, listExpenses } from "@/lib/queries";
@@ -30,9 +30,10 @@ export default async function MovimientosPage({
     listExpenses(team.id, filters),
   ]);
 
-  const total = rows.reduce((a, r) => a + r.amountCents, 0);
+  const primary = team.primaryCurrency;
+  const total = rows.reduce((a, r) => a + r.baseAmountCents, 0);
   const totalNet = rows.reduce(
-    (a, r) => a + r.amountCents - Number(r.reimbursedCents),
+    (a, r) => a + r.baseAmountCents - Number(r.reimbursedBaseCents),
     0,
   );
 
@@ -58,6 +59,7 @@ export default async function MovimientosPage({
 
       <div className="divide-y">
         {rows.map((e) => {
+          const foreign = e.currency !== primary;
           const net = e.amountCents - Number(e.reimbursedCents);
           return (
             <Link
@@ -80,10 +82,17 @@ export default async function MovimientosPage({
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-medium">{formatCents(e.amountCents)}</p>
+                <p className="font-medium">
+                  {formatMoney(e.amountCents, e.currency)}
+                </p>
+                {foreign && (
+                  <p className="text-xs text-muted-foreground">
+                    ≈ {formatCents(e.baseAmountCents)}
+                  </p>
+                )}
                 {Number(e.reimbursedCents) > 0 && (
                   <p className="text-xs text-emerald-600">
-                    neto {formatCents(net)}
+                    neto {formatMoney(net, e.currency)}
                   </p>
                 )}
               </div>

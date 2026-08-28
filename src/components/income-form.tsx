@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MoneyField } from "@/components/money-field";
 import {
   Select,
   SelectContent,
@@ -33,9 +34,15 @@ type Category = {
 
 type Props = {
   categories: Category[];
+  primaryCurrency: string;
+  currencies: string[];
+  usdArsRate: number | null;
+  fxReferenceLabel: string;
   income?: {
     id: string;
     amount: string;
+    currency: string;
+    fxRate: number;
     receivedOn: string;
     categoryId: string;
     subcategoryId: string | null;
@@ -44,13 +51,25 @@ type Props = {
   };
 };
 
-export function IncomeForm({ categories, income }: Props) {
+export function IncomeForm({
+  categories,
+  primaryCurrency,
+  currencies,
+  usdArsRate,
+  fxReferenceLabel,
+  income,
+}: Props) {
   const router = useRouter();
 
   const form = useForm<IncomeInput>({
     resolver: zodResolver(incomeInput),
     defaultValues: {
       amount: income?.amount ?? "",
+      currency: (income?.currency ?? primaryCurrency) as IncomeInput["currency"],
+      fxRate:
+        income && income.currency !== primaryCurrency
+          ? String(income.fxRate)
+          : "",
       receivedOn: income?.receivedOn ?? new Date().toISOString().slice(0, 10),
       categoryId: income?.categoryId ?? "",
       subcategoryId: income?.subcategoryId ?? "",
@@ -92,17 +111,13 @@ export function IncomeForm({ categories, income }: Props) {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-      <div className="space-y-1.5">
-        <Label htmlFor="amount">Monto</Label>
-        <Input
-          id="amount"
-          inputMode="decimal"
-          placeholder="0,00"
-          autoFocus
-          {...form.register("amount")}
-        />
-        <FieldError msg={form.formState.errors.amount?.message} />
-      </div>
+      <MoneyField
+        form={form}
+        primaryCurrency={primaryCurrency}
+        currencies={currencies}
+        usdArsRate={usdArsRate}
+        fxReferenceLabel={fxReferenceLabel}
+      />
 
       <div className="space-y-1.5">
         <Label htmlFor="receivedOn">Fecha</Label>

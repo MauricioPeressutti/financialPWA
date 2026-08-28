@@ -8,12 +8,15 @@ import {
   pendingMovements,
   reimbursements,
   teamMembers,
+  teams,
   telegramLinks,
 } from "@/db/schema";
+import { isCurrency } from "@/lib/currencies";
 import { insertExpense } from "@/lib/expenses-core";
 import { insertIncome } from "@/lib/income-core";
+import { fxForMovement } from "@/lib/fx";
 import { parseExpenseMessage, type ParsedMovement } from "@/lib/gemini";
-import { formatCents } from "@/lib/money";
+import { formatCents, formatMoney } from "@/lib/money";
 import {
   PAYMENT_METHODS,
   paymentMethodMeta,
@@ -97,6 +100,8 @@ function renderMovement(a: {
   id: string;
   confidence?: "alta" | "media" | "baja";
   amountCents: number;
+  currency?: string;
+  baseAmountCents?: number;
   catName: string;
   subName: string | null;
   method: string | null; // null = todavía sin elegir
@@ -121,11 +126,16 @@ function renderMovement(a: {
     ? ` · ${meta[a.method].label}`
     : " · <i>¿con qué?</i>";
 
+  const cur = a.currency || "ARS";
+  const fmt = (c: number) => formatMoney(c, cur);
+  const foreign = cur !== "ARS" && a.baseAmountCents != null;
+
   const lines = [
-    `${icon} <b>${income ? "+" : "−"}${formatCents(a.amountCents)}</b> · ${a.catName}${a.subName ? ` · ${a.subName}` : ""}${methodPart}`,
+    `${icon} <b>${income ? "+" : "−"}${fmt(a.amountCents)}</b> · ${a.catName}${a.subName ? ` · ${a.subName}` : ""}${methodPart}`,
   ];
+  if (foreign) lines.push(`≈ ${formatCents(a.baseAmountCents!)}`);
   if (a.reimbursedCents)
-    lines.push(`↩️ reintegro ${formatCents(a.reimbursedCents)}`);
+    lines.push(`↩️ reintegro ${fmt(a.reimbursedCents)}`);
   if (a.description) lines.push(`<i>${a.description}</i>`);
   if (a.on !== today()) lines.push(`📅 ${a.on}`);
   if (lowConf && a.note) lines.push(`\n<i>${a.note}</i>`);
@@ -169,6 +179,24 @@ async function commitMovement(
     revalidatePath("/analytics");
   };
 
+  // moneda + tipo de cambio
+  const currency = isCurrency(p.currency) ? p.currency : "ARS";
+  const [teamRow] = await db
+    .select({
+      primaryCurrency: teams.primaryCurrency,
+      fxReference: teams.fxReference,
+    })
+    .from(teams)
+    .where(eq(teams.id, teamId))
+    .limit(1);
+  const primary = teamRow?.primaryCurrency ?? "ARS";
+  const fx = await fxForMovement(
+    { primaryCurrency: primary, fxReference: teamRow?.fxReference ?? "blue" },
+    currency,
+  );
+  const fxRate = fx.error ? 1 : fx.fxRate;
+  const baseAmountCents = Math.round(amountCents * fxRate);
+
   if (kind === "ingreso") {
     const cat = resolveCategory(incCats, p.category);
     if (!cat)
@@ -186,6 +214,8 @@ async function commitMovement(
       : "transferencia";
     const { id } = await insertIncome(teamId, userId, {
       amountCents,
+      currency,
+      fxRate,
       categoryId: cat.id,
       subcategoryId: sub?.id ?? null,
       method,
@@ -198,6 +228,8 @@ async function commitMovement(
       id,
       confidence: p.confidence,
       amountCents,
+      currency,
+      baseAmountCents,
       catName: cat.name,
       subName: sub?.name ?? null,
       method: stated ? method : null,
@@ -221,6 +253,8 @@ async function commitMovement(
     p.reimbursed > 0 ? Math.round(p.reimbursed * 100) : null;
   const { id } = await insertExpense(teamId, userId, {
     amountCents,
+    currency,
+    fxRate,
     categoryId: cat.id,
     subcategoryId: sub?.id ?? null,
     paymentMethod: method,
@@ -234,6 +268,8 @@ async function commitMovement(
     id,
     confidence: p.confidence,
     amountCents,
+    currency,
+    baseAmountCents,
     catName: cat.name,
     subName: sub?.name ?? null,
     method: stated ? method : null,
@@ -383,7 +419,7 @@ export async function POST(req: Request) {
         .returning({ id: pendingMovements.id });
       await sendMessage(
         chatId,
-        `🤔 <b>${formatCents(amountCents)}</b>${
+        `🤔 <b>${formatMoney(amountCents, parsed.currency)}</b>${
           parsed.description ? ` · ${parsed.description}` : ""
         }\n¿Fue un <b>gasto</b> o un <b>ingreso</b>?`,
         [
@@ -512,6 +548,8 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
           kind: "ingreso",
           id: mid,
           amountCents: row.amountCents,
+          currency: row.currency,
+          baseAmountCents: row.baseAmountCents,
           catName: row.categoryName,
           subName: row.subcategoryName,
           method: row.method,
@@ -538,6 +576,8 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
           kind: "gasto",
           id: mid,
           amountCents: row.amountCents,
+          currency: row.currency,
+          baseAmountCents: row.baseAmountCents,
           catName: row.categoryName,
           subName: row.subcategoryName,
           method: row.paymentMethod,

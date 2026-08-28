@@ -11,6 +11,7 @@ export type ParsedMovement = {
   kind: "gasto" | "ingreso";
   kindClear: boolean; // false => hay que preguntarle al usuario
   amount: number | null;
+  currency: "ARS" | "USD" | "EUR";
   category: string;
   subcategory: string;
   paymentMethod: string; // gasto: forma de pago · ingreso: medio
@@ -85,8 +86,11 @@ export async function parseExpenseMessage(
     '  "mp"/"mercado pago"=mercadopago.',
     'IMPORTANTE: si el mensaje NO aclara la forma de pago / medio, devolvé paymentMethod = "". No lo adivines.',
     "",
+    "Moneda (currency): ARS por defecto. USD si dice \"usd\", \"u$s\", \"dólares\", \"dolares\",",
+    '  "verdes", "green". EUR si dice "euros"/"eur". El número va sin la moneda.',
+    "",
     "Reglas:",
-    "- amount: monto en pesos, solo el número (5.300 -> 5300). null si no hay monto.",
+    "- amount: solo el número (5.300 -> 5300, 12,99 -> 12.99). null si no hay monto.",
     "- reimbursed: solo para gasto, monto que le devolvieron/reintegraron. 0 si no hubo o es ingreso.",
     '- spentOn: fecha YYYY-MM-DD. "ayer", "el lunes", etc. -> calculala. Sin fecha -> hoy.',
     '- description: detalle corto y opcional (ej: "chino", "nafta", "sueldo agosto").',
@@ -106,6 +110,7 @@ export async function parseExpenseMessage(
           kind: { type: "string", enum: ["gasto", "ingreso"] },
           kindClear: { type: "boolean" },
           amount: { type: "number", nullable: true },
+          currency: { type: "string", enum: ["ARS", "USD", "EUR"] },
           category: { type: "string" },
           subcategory: { type: "string" },
           paymentMethod: { type: "string" },
@@ -119,6 +124,7 @@ export async function parseExpenseMessage(
           "kind",
           "kindClear",
           "amount",
+          "currency",
           "category",
           "paymentMethod",
           "confidence",
@@ -150,6 +156,8 @@ export async function parseExpenseMessage(
       kind: p.kind === "ingreso" ? "ingreso" : "gasto",
       kindClear: p.kindClear !== false,
       amount: typeof p.amount === "number" ? p.amount : null,
+      currency:
+        p.currency === "USD" || p.currency === "EUR" ? p.currency : "ARS",
       category: p.category ?? "",
       subcategory: p.subcategory ?? "",
       paymentMethod: p.paymentMethod ?? "",

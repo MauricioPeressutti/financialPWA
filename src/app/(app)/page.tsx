@@ -4,7 +4,7 @@ import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireTeam } from "@/lib/auth";
-import { formatCents } from "@/lib/money";
+import { formatCents, formatMoney } from "@/lib/money";
 import { fmtDay, fmtTime } from "@/lib/datetime";
 import { PaymentMethodTag } from "@/lib/payment-methods";
 import { IncomeMethodTag } from "@/lib/income-methods";
@@ -31,6 +31,7 @@ export default async function DashboardPage({
 
   const positive = data.balanceCents >= 0;
 
+  const primary = team.primaryCurrency;
   type Mov = {
     key: string;
     kind: "gasto" | "ingreso";
@@ -40,6 +41,8 @@ export default async function DashboardPage({
     title: string;
     method: string;
     amountCents: number;
+    currency: string;
+    baseAmountCents: number;
   };
   const movements: Mov[] = [
     ...recentIncomes.map((e) => ({
@@ -51,6 +54,8 @@ export default async function DashboardPage({
       title: `${e.categoryName}${e.subcategoryName ? ` · ${e.subcategoryName}` : ""}`,
       method: e.method,
       amountCents: e.amountCents,
+      currency: e.currency,
+      baseAmountCents: e.baseAmountCents,
     })),
     ...recent.map((e) => ({
       key: `e${e.id}`,
@@ -61,6 +66,8 @@ export default async function DashboardPage({
       title: `${e.categoryName}${e.subcategoryName ? ` · ${e.subcategoryName}` : ""}`,
       method: e.paymentMethod,
       amountCents: e.amountCents,
+      currency: e.currency,
+      baseAmountCents: e.baseAmountCents,
     })),
   ]
     .sort(
@@ -205,12 +212,19 @@ export default async function DashboardPage({
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 font-medium tabular-nums ${
+                  className={`shrink-0 text-right tabular-nums ${
                     income ? "text-emerald-600" : ""
                   }`}
                 >
-                  {income ? "+" : "−"}
-                  {formatCents(m.amountCents)}
+                  <span className="block font-medium">
+                    {income ? "+" : "−"}
+                    {formatMoney(m.amountCents, m.currency)}
+                  </span>
+                  {m.currency !== primary && (
+                    <span className="block text-[0.66rem] font-normal text-muted-foreground">
+                      ≈ {formatCents(m.baseAmountCents)}
+                    </span>
+                  )}
                 </span>
               </Link>
             );

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { incomes } from "@/db/schema";
 import { requireTeam } from "@/lib/auth";
 import { insertIncome } from "@/lib/income-core";
+import { fxForMovement } from "@/lib/fx";
 import { parseAmountToCents } from "@/lib/money";
 import { incomeInput } from "@/lib/validation";
 
@@ -26,8 +27,13 @@ export async function createIncome(raw: unknown): Promise<ActionResult> {
   const cents = parseAmountToCents(parsed.data.amount);
   if (cents === null || cents === 0) return { ok: false, error: "Monto inválido" };
 
+  const fx = await fxForMovement(team, parsed.data.currency, parsed.data.fxRate);
+  if (fx.error) return { ok: false, error: fx.error };
+
   await insertIncome(team.id, user.id, {
     amountCents: cents,
+    currency: parsed.data.currency,
+    fxRate: fx.fxRate,
     categoryId: parsed.data.categoryId,
     subcategoryId: parsed.data.subcategoryId || null,
     method: parsed.data.method,
@@ -47,10 +53,16 @@ export async function updateIncome(id: string, raw: unknown): Promise<ActionResu
   const cents = parseAmountToCents(parsed.data.amount);
   if (cents === null || cents === 0) return { ok: false, error: "Monto inválido" };
 
+  const fx = await fxForMovement(team, parsed.data.currency, parsed.data.fxRate);
+  if (fx.error) return { ok: false, error: fx.error };
+
   const updated = await db
     .update(incomes)
     .set({
       amountCents: cents,
+      currency: parsed.data.currency,
+      fxRate: fx.fxRate,
+      baseAmountCents: Math.round(cents * fx.fxRate),
       categoryId: parsed.data.categoryId,
       subcategoryId: parsed.data.subcategoryId || null,
       method: parsed.data.method,

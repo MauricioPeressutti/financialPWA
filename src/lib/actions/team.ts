@@ -14,6 +14,7 @@ import {
   requireTeam,
 } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/firebase/admin";
+import { FX_REFERENCES, isCurrency } from "@/lib/currencies";
 
 type ActionResult<T = unknown> =
   | ({ ok: true } & T)
@@ -79,6 +80,36 @@ export async function removeMember(userId: string): Promise<ActionResult> {
   await db
     .delete(teamMembers)
     .where(and(eq(teamMembers.teamId, team.id), eq(teamMembers.userId, userId)));
+  revalidatePath("/team");
+  return { ok: true };
+}
+
+export async function updateTeamCurrencies(input: {
+  primaryCurrency: string;
+  currencies: string[];
+  fxReference: string;
+}): Promise<ActionResult> {
+  const { user, team } = await requireTeam();
+  const role = await assertMembership(user.id, team.id);
+  if (role !== "owner")
+    return { ok: false, error: "Solo el owner puede cambiar esto" };
+
+  const primary = isCurrency(input.primaryCurrency)
+    ? input.primaryCurrency
+    : "ARS";
+  const list = Array.from(
+    new Set([primary, ...input.currencies.filter(isCurrency)]),
+  );
+  const ref = (FX_REFERENCES as readonly string[]).includes(input.fxReference)
+    ? input.fxReference
+    : "blue";
+
+  await db
+    .update(teams)
+    .set({ primaryCurrency: primary, currencies: list, fxReference: ref })
+    .where(eq(teams.id, team.id));
+
+  revalidatePath("/", "layout");
   revalidatePath("/team");
   return { ok: true };
 }

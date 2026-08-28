@@ -9,12 +9,14 @@ import type { PaymentMethod } from "@/lib/payment-methods";
 
 export type NewExpense = {
   amountCents: number;
+  currency?: string; // default "ARS"
+  fxRate?: number; // 1 currency = fxRate moneda principal (default 1)
   categoryId: string;
   subcategoryId?: string | null;
   paymentMethod: PaymentMethod;
   description?: string | null;
   spentOn: string; // YYYY-MM-DD
-  reimbursedCents?: number | null;
+  reimbursedCents?: number | null; // en la misma moneda que el gasto
 };
 
 /**
@@ -36,12 +38,19 @@ export async function insertExpense(
     if (!sub) subId = null;
   }
 
+  const currency = e.currency || "ARS";
+  const fxRate = e.fxRate && e.fxRate > 0 ? e.fxRate : 1;
+  const baseAmountCents = Math.round(e.amountCents * fxRate);
+
   const [created] = await db
     .insert(expenses)
     .values({
       teamId,
       createdByUserId: userId,
       amountCents: e.amountCents,
+      currency,
+      fxRate,
+      baseAmountCents,
       categoryId: e.categoryId,
       subcategoryId: subId,
       paymentMethod: e.paymentMethod,
@@ -55,6 +64,9 @@ export async function insertExpense(
       expenseId: created.id,
       teamId,
       amountCents: e.reimbursedCents,
+      currency,
+      fxRate,
+      baseAmountCents: Math.round(e.reimbursedCents * fxRate),
       note: "Reintegro al cargar el gasto",
       reimbursedOn: e.spentOn,
     });

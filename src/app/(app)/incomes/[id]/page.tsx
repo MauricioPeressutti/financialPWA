@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DeleteIncomeButton } from "@/components/delete-income-button";
 import { requireTeam } from "@/lib/auth";
-import { formatCents } from "@/lib/money";
+import { formatCents, formatMoney } from "@/lib/money";
 import { fmtDateTime } from "@/lib/datetime";
+import { currencyMeta, type Currency } from "@/lib/currencies";
 import { incomeMethodLabels } from "@/lib/income-methods";
 import { getIncome } from "@/lib/queries";
 
@@ -16,6 +17,7 @@ export default async function IncomeDetailPage({
   const { id } = await params;
   const income = await getIncome(team.id, id);
   if (!income) notFound();
+  const foreign = income.currency !== team.primaryCurrency;
 
   return (
     <div className="space-y-5">
@@ -30,8 +32,13 @@ export default async function IncomeDetailPage({
 
       <div className="rounded-lg border p-4">
         <p className="text-3xl font-bold text-emerald-600">
-          {formatCents(income.amountCents)}
+          {formatMoney(income.amountCents, income.currency)}
         </p>
+        {foreign && (
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            ≈ {formatCents(income.baseAmountCents)} al cargar
+          </p>
+        )}
         <dl className="mt-4 space-y-1.5 text-sm">
           <Row k="Fecha" v={income.receivedOn} />
           <Row
@@ -39,6 +46,18 @@ export default async function IncomeDetailPage({
             v={`${income.categoryName}${income.subcategoryName ? ` · ${income.subcategoryName}` : ""}`}
           />
           <Row k="Medio" v={incomeMethodLabels[income.method] ?? income.method} />
+          {foreign && (
+            <>
+              <Row
+                k="Tipo de cambio"
+                v={`1 ${income.currency} = ${formatCents(Math.round(income.fxRate * 100))}`}
+              />
+              <Row
+                k="Equivalente"
+                v={`${formatCents(income.baseAmountCents)} (${currencyMeta[team.primaryCurrency as Currency]?.label ?? team.primaryCurrency})`}
+              />
+            </>
+          )}
           {income.description && <Row k="Descripción" v={income.description} />}
           <Row
             k="Cargado"

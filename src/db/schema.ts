@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
@@ -9,6 +10,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -84,8 +86,37 @@ export const teams = pgTable("teams", {
   ownerUserId: uuid("owner_user_id")
     .notNull()
     .references(() => users.id),
+  primaryCurrency: text("primary_currency").notNull().default("ARS"),
+  currencies: jsonb("currencies")
+    .notNull()
+    .$type<string[]>()
+    .default(["ARS", "USD"]),
+  fxReference: text("fx_reference").notNull().default("blue"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ─── Cotizaciones (cache diario) ───────────────────────
+export const exchangeRates = pgTable(
+  "exchange_rates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    day: date("day").notNull(),
+    base: text("base").notNull(), // p.ej. "USD"
+    quote: text("quote").notNull(), // p.ej. "ARS"
+    reference: text("reference").notNull().default("blue"),
+    rate: doublePrecision("rate").notNull(), // 1 base = rate quote
+    source: text("source").notNull().default("dolarapi"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("exchange_rates_day_pair_idx").on(
+      t.day,
+      t.base,
+      t.quote,
+      t.reference,
+    ),
+  ],
+);
 
 export const teamMembers = pgTable(
   "team_members",
@@ -156,6 +187,8 @@ export const expenses = pgTable(
       .references(() => users.id),
     amountCents: integer("amount_cents").notNull(),
     currency: text("currency").notNull().default("ARS"),
+    fxRate: doublePrecision("fx_rate").notNull().default(1), // 1 currency = fxRate moneda principal
+    baseAmountCents: integer("base_amount_cents").notNull().default(0), // equivalente en moneda principal
     categoryId: uuid("category_id")
       .notNull()
       .references(() => categories.id),
@@ -185,6 +218,8 @@ export const incomes = pgTable(
       .references(() => users.id),
     amountCents: integer("amount_cents").notNull(),
     currency: text("currency").notNull().default("ARS"),
+    fxRate: doublePrecision("fx_rate").notNull().default(1),
+    baseAmountCents: integer("base_amount_cents").notNull().default(0),
     categoryId: uuid("category_id")
       .notNull()
       .references(() => categories.id),
@@ -213,6 +248,9 @@ export const reimbursements = pgTable(
       .notNull()
       .references(() => teams.id, { onDelete: "cascade" }),
     amountCents: integer("amount_cents").notNull(),
+    currency: text("currency").notNull().default("ARS"),
+    fxRate: doublePrecision("fx_rate").notNull().default(1),
+    baseAmountCents: integer("base_amount_cents").notNull().default(0),
     note: text("note"),
     reimbursedOn: date("reimbursed_on").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -228,6 +266,7 @@ export type Subcategory = typeof subcategories.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type Income = typeof incomes.$inferSelect;
 export type Reimbursement = typeof reimbursements.$inferSelect;
+export type ExchangeRate = typeof exchangeRates.$inferSelect;
 export type PaymentMethod = (typeof paymentMethod.enumValues)[number];
 export type IncomeMethod = (typeof incomeMethod.enumValues)[number];
 export type CategoryKind = (typeof categoryKind.enumValues)[number];

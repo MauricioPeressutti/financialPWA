@@ -8,6 +8,8 @@ import type { IncomeMethod } from "@/lib/income-methods";
 
 export type NewIncome = {
   amountCents: number;
+  currency?: string;
+  fxRate?: number;
   categoryId: string;
   subcategoryId?: string | null;
   method: IncomeMethod;
@@ -34,12 +36,18 @@ export async function insertIncome(
     if (!sub) subId = null;
   }
 
+  const currency = e.currency || "ARS";
+  const fxRate = e.fxRate && e.fxRate > 0 ? e.fxRate : 1;
+
   const [created] = await db
     .insert(incomes)
     .values({
       teamId,
       createdByUserId: userId,
       amountCents: e.amountCents,
+      currency,
+      fxRate,
+      baseAmountCents: Math.round(e.amountCents * fxRate),
       categoryId: e.categoryId,
       subcategoryId: subId,
       method: e.method,

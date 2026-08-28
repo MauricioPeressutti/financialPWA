@@ -54,12 +54,12 @@ export function CategoryDonut({
 
   const R = 42;
   const C = 2 * Math.PI * R;
-  let acc = 0;
-  const arcs = data.map((s) => {
+  const arcs = data.map((s, i) => {
     const frac = s.grossCents / total;
-    const arc = { s, frac, offset: acc };
-    acc += frac;
-    return arc;
+    const offset = data
+      .slice(0, i)
+      .reduce((sum, d) => sum + d.grossCents / total, 0);
+    return { s, frac, offset };
   });
 
   const shown = locked ?? active;

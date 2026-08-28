@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Check,
   Copy,
   LogOut,
   MoreVertical,
@@ -36,8 +35,17 @@ import {
   removeMember,
   renameTeam,
   revokeInvitation,
+  updateTeamCurrencies,
 } from "@/lib/actions/team";
 import { linkTelegram, unlinkTelegram } from "@/lib/actions/telegram";
+import {
+  CURRENCIES,
+  currencyMeta,
+  FX_REFERENCES,
+  fxReferenceLabel,
+  type Currency,
+} from "@/lib/currencies";
+import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 type Member = {
@@ -68,6 +76,13 @@ function daysLeft(iso: string) {
   return d <= 0 ? "vencida" : d === 1 ? "vence mañana" : `vence en ${d} días`;
 }
 
+type CurrencySettings = {
+  primary: string;
+  active: string[];
+  reference: string;
+  usdArsRate: number | null;
+};
+
 export function TeamManager({
   isOwner,
   currentUserId,
@@ -75,6 +90,7 @@ export function TeamManager({
   members,
   invites,
   telegramLinked,
+  currency,
 }: {
   isOwner: boolean;
   currentUserId: string;
@@ -82,6 +98,7 @@ export function TeamManager({
   members: Member[];
   invites: Invite[];
   telegramLinked: boolean;
+  currency: CurrencySettings;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -427,6 +444,9 @@ export function TeamManager({
         )}
       </section>
 
+      {/* ── Monedas ── */}
+      <CurrencySection isOwner={isOwner} settings={currency} />
+
       {/* ── Salir (miembro) ── */}
       {!isOwner && (
         <div className="text-center">
@@ -515,6 +535,162 @@ export function TeamManager({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function CurrencySection({
+  isOwner,
+  settings,
+}: {
+  isOwner: boolean;
+  settings: CurrencySettings;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [primary, setPrimary] = useState(settings.primary);
+  const [active, setActive] = useState<string[]>(settings.active);
+  const [reference, setReference] = useState(settings.reference);
+
+  const dirty =
+    primary !== settings.primary ||
+    reference !== settings.reference ||
+    active.slice().sort().join() !== settings.active.slice().sort().join();
+
+  function toggle(c: string) {
+    if (c === primary) return;
+    setActive((a) => (a.includes(c) ? a.filter((x) => x !== c) : [...a, c]));
+  }
+
+  function save() {
+    startTransition(async () => {
+      const r = await updateTeamCurrencies({
+        primaryCurrency: primary,
+        currencies: Array.from(new Set([primary, ...active])),
+        fxReference: reference,
+      });
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success("Monedas actualizadas");
+      router.refresh();
+    });
+  }
+
+  const foreignActive = active.filter((c) => c !== primary);
+
+  return (
+    <section className="cosmic-panel rounded-2xl border p-4">
+      <p className="mb-3 text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground">
+        Monedas
+      </p>
+
+      {isOwner ? (
+        <div className="space-y-3.5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Moneda principal</p>
+              <p className="text-xs text-muted-foreground">
+                En la que se muestran los totales.
+              </p>
+            </div>
+            <select
+              className="rounded-lg border bg-[var(--field-surface)] px-2.5 py-1.5 text-sm font-semibold"
+              value={primary}
+              onChange={(e) => {
+                setPrimary(e.target.value);
+                setActive((a) =>
+                  a.includes(e.target.value) ? a : [...a, e.target.value],
+                );
+              }}
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {currencyMeta[c].label} ({currencyMeta[c].symbol})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium">Monedas que usamos</p>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Aparecen en el selector al cargar un movimiento.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {CURRENCIES.map((c) => {
+                const on = c === primary || active.includes(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    disabled={c === primary}
+                    aria-pressed={on}
+                    onClick={() => toggle(c)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+                      on
+                        ? "border-primary bg-primary/15 text-primary"
+                        : "border-border text-muted-foreground",
+                      c === primary && "opacity-60",
+                    )}
+                  >
+                    {currencyMeta[c].symbol} {c}
+                    {c === primary ? " · principal" : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {foreignActive.length > 0 && (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Referencia del dólar</p>
+                <p className="text-xs text-muted-foreground">
+                  Qué cotización usar para convertir.
+                </p>
+              </div>
+              <select
+                className="rounded-lg border bg-[var(--field-surface)] px-2.5 py-1.5 text-sm font-semibold"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+              >
+                {FX_REFERENCES.map((r) => (
+                  <option key={r} value={r}>
+                    {fxReferenceLabel[r]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {settings.usdArsRate && (
+            <p className="text-xs text-muted-foreground">
+              Cotización de hoy: 1 US$ ={" "}
+              {formatCents(Math.round(settings.usdArsRate * 100))} ·{" "}
+              {fxReferenceLabel[settings.reference as keyof typeof fxReferenceLabel] ??
+                settings.reference}
+            </p>
+          )}
+
+          {dirty && (
+            <Button className="w-full" disabled={pending} onClick={save}>
+              Guardar
+            </Button>
+          )}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Principal: <b className="text-foreground">
+            {currencyMeta[settings.primary as Currency]?.label ?? settings.primary}
+          </b>
+          {settings.active.length > 1 && (
+            <> · también {settings.active.filter((c) => c !== settings.primary).join(", ")}</>
+          )}
+        </p>
+      )}
+    </section>
   );
 }
 

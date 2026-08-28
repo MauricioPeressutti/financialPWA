@@ -99,11 +99,18 @@ export async function listExpenses(teamId: string, filters: ExpenseFilters = {})
     select sum(${reimbursements.amountCents}) from ${reimbursements}
     where ${reimbursements.expenseId} = ${expenses.id}
   ), 0)`;
+  const reimbBaseSum = sql<number>`coalesce((
+    select sum(${reimbursements.baseAmountCents}) from ${reimbursements}
+    where ${reimbursements.expenseId} = ${expenses.id}
+  ), 0)`;
 
   return db
     .select({
       id: expenses.id,
       amountCents: expenses.amountCents,
+      currency: expenses.currency,
+      fxRate: expenses.fxRate,
+      baseAmountCents: expenses.baseAmountCents,
       paymentMethod: expenses.paymentMethod,
       description: expenses.description,
       spentOn: expenses.spentOn,
@@ -112,6 +119,7 @@ export async function listExpenses(teamId: string, filters: ExpenseFilters = {})
       subcategoryName: subcategories.name,
       createdBy: users.displayName,
       reimbursedCents: reimbSum,
+      reimbursedBaseCents: reimbBaseSum,
     })
     .from(expenses)
     .innerJoin(categories, eq(categories.id, expenses.categoryId))
@@ -126,6 +134,9 @@ export async function getExpense(teamId: string, id: string) {
     .select({
       id: expenses.id,
       amountCents: expenses.amountCents,
+      currency: expenses.currency,
+      fxRate: expenses.fxRate,
+      baseAmountCents: expenses.baseAmountCents,
       paymentMethod: expenses.paymentMethod,
       description: expenses.description,
       spentOn: expenses.spentOn,
@@ -178,6 +189,9 @@ export async function listIncomes(teamId: string, filters: IncomeFilters = {}) {
     .select({
       id: incomes.id,
       amountCents: incomes.amountCents,
+      currency: incomes.currency,
+      fxRate: incomes.fxRate,
+      baseAmountCents: incomes.baseAmountCents,
       method: incomes.method,
       description: incomes.description,
       receivedOn: incomes.receivedOn,
@@ -199,6 +213,9 @@ export async function getIncome(teamId: string, id: string) {
     .select({
       id: incomes.id,
       amountCents: incomes.amountCents,
+      currency: incomes.currency,
+      fxRate: incomes.fxRate,
+      baseAmountCents: incomes.baseAmountCents,
       method: incomes.method,
       description: incomes.description,
       receivedOn: incomes.receivedOn,
@@ -231,19 +248,19 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
     .select({
       categoryId: categories.id,
       categoryName: categories.name,
-      totalCents: sql<number>`sum(${expenses.amountCents})`,
+      totalCents: sql<number>`sum(${expenses.baseAmountCents})`,
       count: sql<number>`count(*)`,
     })
     .from(expenses)
     .innerJoin(categories, eq(categories.id, expenses.categoryId))
     .where(inMonth)
     .groupBy(categories.id, categories.name)
-    .orderBy(sql`sum(${expenses.amountCents}) desc`);
+    .orderBy(sql`sum(${expenses.baseAmountCents}) desc`);
 
   const byMethod = await db
     .select({
       paymentMethod: expenses.paymentMethod,
-      totalCents: sql<number>`sum(${expenses.amountCents})`,
+      totalCents: sql<number>`sum(${expenses.baseAmountCents})`,
     })
     .from(expenses)
     .where(inMonth)
@@ -251,7 +268,7 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
 
   const [totals] = await db
     .select({
-      totalCents: sql<number>`coalesce(sum(${expenses.amountCents}), 0)`,
+      totalCents: sql<number>`coalesce(sum(${expenses.baseAmountCents}), 0)`,
       count: sql<number>`count(*)`,
     })
     .from(expenses)
@@ -259,7 +276,7 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
 
   const [refunds] = await db
     .select({
-      totalCents: sql<number>`coalesce(sum(${reimbursements.amountCents}), 0)`,
+      totalCents: sql<number>`coalesce(sum(${reimbursements.baseAmountCents}), 0)`,
     })
     .from(reimbursements)
     .where(
@@ -278,7 +295,7 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
 
   const [incTotals] = await db
     .select({
-      totalCents: sql<number>`coalesce(sum(${incomes.amountCents}), 0)`,
+      totalCents: sql<number>`coalesce(sum(${incomes.baseAmountCents}), 0)`,
       count: sql<number>`count(*)`,
     })
     .from(incomes)
@@ -288,14 +305,14 @@ export async function getMonthlyDashboard(teamId: string, month: string) {
     .select({
       categoryId: categories.id,
       categoryName: categories.name,
-      totalCents: sql<number>`sum(${incomes.amountCents})`,
+      totalCents: sql<number>`sum(${incomes.baseAmountCents})`,
       count: sql<number>`count(*)`,
     })
     .from(incomes)
     .innerJoin(categories, eq(categories.id, incomes.categoryId))
     .where(inMonthInc)
     .groupBy(categories.id, categories.name)
-    .orderBy(sql`sum(${incomes.amountCents}) desc`);
+    .orderBy(sql`sum(${incomes.baseAmountCents}) desc`);
 
   const grossCents = Number(totals?.totalCents ?? 0);
   const reimbursedCents = Number(refunds?.totalCents ?? 0);

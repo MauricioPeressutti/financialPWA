@@ -2,9 +2,15 @@ import { z } from "zod";
 
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { INCOME_METHODS } from "@/lib/income-methods";
+import { CURRENCIES } from "@/lib/currencies";
+
+const currencyField = z.enum(CURRENCIES);
+const fxRateField = z.string().optional().or(z.literal("")); // override manual del TC
 
 export const expenseInput = z.object({
   amount: z.string().min(1, "Ingresá un monto"),
+  currency: currencyField,
+  fxRate: fxRateField,
   spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
   categoryId: z.string().uuid("Elegí una categoría"),
   subcategoryId: z.string().uuid().optional().or(z.literal("")),
@@ -25,6 +31,8 @@ export const reimbursementInput = z.object({
 
 export const incomeInput = z.object({
   amount: z.string().min(1, "Ingresá un monto"),
+  currency: currencyField,
+  fxRate: fxRateField,
   receivedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
   categoryId: z.string().uuid("Elegí una fuente"),
   subcategoryId: z.string().uuid().optional().or(z.literal("")),

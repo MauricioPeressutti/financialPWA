@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { IncomeFilters } from "@/components/income-filters";
 import { MovimientosTabs } from "@/components/movimientos-tabs";
 import { requireTeam } from "@/lib/auth";
-import { formatCents } from "@/lib/money";
+import { formatCents, formatMoney } from "@/lib/money";
 import { fmtDay, fmtTime } from "@/lib/datetime";
 import { IncomeMethodTag, type IncomeMethod } from "@/lib/income-methods";
 import { getActiveCategories, listIncomes } from "@/lib/queries";
@@ -30,7 +30,8 @@ export default async function IngresosPage({
     listIncomes(team.id, filters),
   ]);
 
-  const total = rows.reduce((a, r) => a + r.amountCents, 0);
+  const primary = team.primaryCurrency;
+  const total = rows.reduce((a, r) => a + r.baseAmountCents, 0);
 
   return (
     <div className="space-y-4">
@@ -71,9 +72,16 @@ export default async function IngresosPage({
                 {e.description ? <span>· {e.description}</span> : null}
               </p>
             </div>
-            <p className="shrink-0 font-medium text-emerald-600">
-              {formatCents(e.amountCents)}
-            </p>
+            <div className="shrink-0 text-right">
+              <p className="font-medium text-emerald-600">
+                {formatMoney(e.amountCents, e.currency)}
+              </p>
+              {e.currency !== primary && (
+                <p className="text-xs text-muted-foreground">
+                  ≈ {formatCents(e.baseAmountCents)}
+                </p>
+              )}
+            </div>
           </Link>
         ))}
         {rows.length === 0 && (

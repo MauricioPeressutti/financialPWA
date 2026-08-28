@@ -18,7 +18,7 @@ import {
   type AnalyticsRange as Range,
 } from "@/lib/analytics";
 import { buildInsights } from "@/lib/analytics-insights";
-import { formatCents } from "@/lib/money";
+import { formatCents, formatMoney } from "@/lib/money";
 import { IncomeMethodTag } from "@/lib/income-methods";
 import { PaymentMethodTag, paymentMethodLabels } from "@/lib/payment-methods";
 import { getActiveCategories, getTeamMembers } from "@/lib/queries";
@@ -378,10 +378,17 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                         </p>
                       </div>
                       <span
-                        className={`shrink-0 font-semibold tabular-nums ${pos ? "text-emerald-600" : ""}`}
+                        className={`shrink-0 text-right font-semibold tabular-nums ${pos ? "text-emerald-600" : ""}`}
                       >
-                        {pos ? "+" : "−"}
-                        {formatCents(m.amountCents)}
+                        <span className="block">
+                          {pos ? "+" : "−"}
+                          {formatMoney(m.amountCents, m.currency)}
+                        </span>
+                        {m.currency !== team.primaryCurrency && (
+                          <span className="block text-[0.66rem] font-normal text-muted-foreground">
+                            ≈ {formatCents(m.baseAmountCents)}
+                          </span>
+                        )}
                       </span>
                     </Link>
                   );
