@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { CosmicBackground } from "@/components/cosmic-background";
 import { cn } from "@/lib/utils";
 
 type Player = { id: string; name: string };
@@ -364,11 +365,13 @@ export function WhoInvites({ players }: { players: Player[] }) {
       {open && (
         <div
           className={cn(
-            "fixed inset-0 z-50 flex flex-col bg-background p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))] duration-300 animate-in fade-in slide-in-from-bottom-8",
+            "fixed inset-0 z-50 flex flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))] duration-300 animate-in fade-in slide-in-from-bottom-8",
             shake && "qi-shake",
           )}
         >
-          {/* misma vineta cosmica que usa el fondo de la app */}
+          {/* fondo opaco + mismo cielo estrellado que usa la app */}
+          <div aria-hidden className="absolute inset-0 -z-20 bg-background" />
+          <CosmicBackground />
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0"
