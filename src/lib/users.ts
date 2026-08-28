@@ -10,6 +10,7 @@ const DEFAULT_CATEGORIES: Record<string, string[]> = {
   Supermercado: ["Comida", "Limpieza", "Bebidas"],
   Hogar: ["Alquiler", "Expensas", "Servicios", "Muebles"],
   Transporte: ["Nafta", "SUBE", "Taxi/App", "Mantenimiento"],
+  Delivery: ["Rappi", "PedidosYa", "Uber Eats", "Otro"],
   Salud: ["Farmacia", "Obra social", "Consultas"],
   Ocio: ["Salidas", "Streaming", "Viajes"],
   Otros: [],
