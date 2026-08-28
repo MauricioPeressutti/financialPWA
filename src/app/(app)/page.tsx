@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireTeam } from "@/lib/auth";
 import { formatCents } from "@/lib/money";
+import { fmtDay, fmtTime } from "@/lib/datetime";
 import { PaymentMethodTag } from "@/lib/payment-methods";
 import { IncomeMethodTag } from "@/lib/income-methods";
 import {
@@ -35,6 +36,7 @@ export default async function DashboardPage({
     kind: "gasto" | "ingreso";
     id: string;
     date: string;
+    createdAt: Date;
     title: string;
     method: string;
     amountCents: number;
@@ -45,6 +47,7 @@ export default async function DashboardPage({
       kind: "ingreso" as const,
       id: e.id,
       date: e.receivedOn,
+      createdAt: e.createdAt,
       title: `${e.categoryName}${e.subcategoryName ? ` · ${e.subcategoryName}` : ""}`,
       method: e.method,
       amountCents: e.amountCents,
@@ -54,12 +57,17 @@ export default async function DashboardPage({
       kind: "gasto" as const,
       id: e.id,
       date: e.spentOn,
+      createdAt: e.createdAt,
       title: `${e.categoryName}${e.subcategoryName ? ` · ${e.subcategoryName}` : ""}`,
       method: e.paymentMethod,
       amountCents: e.amountCents,
     })),
   ]
-    .sort((a, b) => b.date.localeCompare(a.date))
+    .sort(
+      (a, b) =>
+        b.date.localeCompare(a.date) ||
+        b.createdAt.getTime() - a.createdAt.getTime(),
+    )
     .slice(0, 12);
 
   return (
@@ -186,7 +194,9 @@ export default async function DashboardPage({
                 <div className="min-w-0 flex-1">
                   <p className="truncate">{m.title}</p>
                   <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <span>{m.date} ·</span>
+                    <span>
+                      {fmtDay(m.date)} · {fmtTime(m.createdAt)} ·
+                    </span>
                     {income ? (
                       <IncomeMethodTag method={m.method} />
                     ) : (

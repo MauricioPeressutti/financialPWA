@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DeleteIncomeButton } from "@/components/delete-income-button";
 import { requireTeam } from "@/lib/auth";
 import { formatCents } from "@/lib/money";
+import { fmtDateTime } from "@/lib/datetime";
 import { incomeMethodLabels } from "@/lib/income-methods";
 import { getIncome } from "@/lib/queries";
 
@@ -39,7 +40,12 @@ export default async function IncomeDetailPage({
           />
           <Row k="Medio" v={incomeMethodLabels[income.method] ?? income.method} />
           {income.description && <Row k="Descripción" v={income.description} />}
-          {income.createdBy && <Row k="Cargado por" v={income.createdBy} />}
+          <Row
+            k="Cargado"
+            v={`${fmtDateTime(income.createdAt)}${
+              income.createdBy ? ` · ${income.createdBy}` : ""
+            }`}
+          />
         </dl>
       </div>
 

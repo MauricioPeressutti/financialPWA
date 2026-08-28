@@ -5,6 +5,7 @@ import { ExpenseFilters } from "@/components/expense-filters";
 import { MovimientosTabs } from "@/components/movimientos-tabs";
 import { requireTeam } from "@/lib/auth";
 import { formatCents } from "@/lib/money";
+import { fmtDay, fmtTime } from "@/lib/datetime";
 import { PaymentMethodTag, type PaymentMethod } from "@/lib/payment-methods";
 import { getActiveCategories, listExpenses } from "@/lib/queries";
 
@@ -70,7 +71,9 @@ export default async function MovimientosPage({
                   {e.subcategoryName ? ` · ${e.subcategoryName}` : ""}
                 </p>
                 <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <span>{e.spentOn}</span>
+                  <span>
+                    {fmtDay(e.spentOn)} · {fmtTime(e.createdAt)}
+                  </span>
                   <span>·</span>
                   <PaymentMethodTag method={e.paymentMethod} />
                   {e.description ? <span>· {e.description}</span> : null}

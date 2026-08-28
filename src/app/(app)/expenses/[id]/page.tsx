@@ -6,6 +6,7 @@ import { DeleteExpenseButton } from "@/components/delete-expense-button";
 import { ReimbursementSection } from "@/components/reimbursement-section";
 import { requireTeam } from "@/lib/auth";
 import { formatCents } from "@/lib/money";
+import { fmtDateTime } from "@/lib/datetime";
 import { paymentMethodLabels } from "@/lib/payment-methods";
 import { getExpense } from "@/lib/queries";
 
@@ -46,7 +47,12 @@ export default async function ExpenseDetailPage({
           />
           <Row k="Forma de pago" v={paymentMethodLabels[expense.paymentMethod]} />
           {expense.description && <Row k="Descripción" v={expense.description} />}
-          {expense.createdBy && <Row k="Cargado por" v={expense.createdBy} />}
+          <Row
+            k="Cargado"
+            v={`${fmtDateTime(expense.createdAt)}${
+              expense.createdBy ? ` · ${expense.createdBy}` : ""
+            }`}
+          />
         </dl>
       </div>
 

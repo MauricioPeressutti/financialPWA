@@ -5,6 +5,7 @@ import { IncomeFilters } from "@/components/income-filters";
 import { MovimientosTabs } from "@/components/movimientos-tabs";
 import { requireTeam } from "@/lib/auth";
 import { formatCents } from "@/lib/money";
+import { fmtDay, fmtTime } from "@/lib/datetime";
 import { IncomeMethodTag, type IncomeMethod } from "@/lib/income-methods";
 import { getActiveCategories, listIncomes } from "@/lib/queries";
 
@@ -62,7 +63,9 @@ export default async function IngresosPage({
                 {e.subcategoryName ? ` · ${e.subcategoryName}` : ""}
               </p>
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span>{e.receivedOn}</span>
+                <span>
+                  {fmtDay(e.receivedOn)} · {fmtTime(e.createdAt)}
+                </span>
                 <span>·</span>
                 <IncomeMethodTag method={e.method} />
                 {e.description ? <span>· {e.description}</span> : null}
