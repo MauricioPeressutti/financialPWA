@@ -91,6 +91,21 @@
   --chart-4: #23b5a0;
   --chart-5: #7c8bab;
 
+  /* Paleta categórica para análisis — validada (CVD-safe), columna clara */
+  --cat-0: #2a78d6;
+  --cat-1: #eb6834;
+  --cat-2: #1baf7a;
+  --cat-3: #eda100;
+  --cat-4: #e87ba4;
+  --cat-5: #4a3aa7;
+
+  /* Rampa secuencial (mapa de calor de gasto diario) */
+  --heat-0: rgba(91, 192, 190, 0.12);
+  --heat-1: rgba(91, 192, 190, 0.32);
+  --heat-2: rgba(69, 168, 178, 0.55);
+  --heat-3: rgba(47, 133, 156, 0.78);
+  --heat-4: #1f6f86;
+
   --radius: 0.8rem;
 
   --sidebar: #f4f6fd;
@@ -158,6 +173,20 @@
   --chart-3: #9d7bff;
   --chart-4: #6fffe9;
   --chart-5: #3a506b;
+
+  /* Paleta categórica para análisis — columna oscura (misma, re-escalada) */
+  --cat-0: #3987e5;
+  --cat-1: #d95926;
+  --cat-2: #199e70;
+  --cat-3: #c98500;
+  --cat-4: #d55181;
+  --cat-5: #9085e9;
+
+  --heat-0: rgba(91, 192, 190, 0.08);
+  --heat-1: rgba(91, 192, 190, 0.24);
+  --heat-2: rgba(111, 255, 233, 0.34);
+  --heat-3: rgba(111, 255, 233, 0.6);
+  --heat-4: #6fffe9;
 
   --sidebar: #101830;
   --sidebar-foreground: #e7ecfb;

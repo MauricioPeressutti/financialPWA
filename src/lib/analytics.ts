@@ -6,6 +6,7 @@ import { db } from "@/db";
 import {
   categories,
   expenses,
+  incomes,
   reimbursements,
   subcategories,
   users,
@@ -19,42 +20,69 @@ export {
 } from "@/lib/analytics-range";
 
 const n = (v: unknown) => Number(v ?? 0);
+const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+/** Índice de color (0-5) estable para una categoría, según su posición
+ *  alfabética dentro de la lista completa. "Otros" siempre cae en el 5. */
+export function buildCategoryColors(allNames: string[]): Record<string, number> {
+  const sorted = [...allNames].sort((a, b) => a.localeCompare(b, "es"));
+  const map: Record<string, number> = {};
+  let i = 0;
+  for (const name of sorted) {
+    if (/^otros$/i.test(name)) map[name] = 5;
+    else {
+      map[name] = i % 5; // 0..4 para las "normales"
+      i++;
+    }
+  }
+  return map;
+}
+
+// ─────────────────────────────────────────────────────────
 export async function getAnalytics(
   teamId: string,
   from: string,
   to: string,
   memberId?: string,
 ) {
-  const memberCond = memberId
-    ? [eq(expenses.createdByUserId, memberId)]
-    : [];
+  const mE = memberId ? [eq(expenses.createdByUserId, memberId)] : [];
+  const mI = memberId ? [eq(incomes.createdByUserId, memberId)] : [];
 
   const inRange = and(
     eq(expenses.teamId, teamId),
     gte(expenses.spentOn, from),
     lte(expenses.spentOn, to),
-    ...memberCond,
+    ...mE,
   );
-  // reintegros del período, filtrados por el autor del gasto asociado
   const refInRange = and(
     eq(reimbursements.teamId, teamId),
     gte(reimbursements.reimbursedOn, from),
     lte(reimbursements.reimbursedOn, to),
-    ...memberCond,
+    ...mE,
+  );
+  const incInRange = and(
+    eq(incomes.teamId, teamId),
+    gte(incomes.receivedOn, from),
+    lte(incomes.receivedOn, to),
+    ...mI,
   );
 
   const [
     totalsRow,
     refTotalRow,
+    incTotalRow,
     catRows,
     catRefRows,
     subRows,
     methodRows,
     memberRows,
     memberRefRows,
-    weekdayRows,
-    topRows,
+    memberCatRows,
+    dayRows,
+    topExpRows,
+    topIncRows,
+    incSourceRows,
+    incMemberRows,
   ] = await Promise.all([
     db
       .select({
@@ -62,7 +90,6 @@ export async function getAnalytics(
         count: sql<number>`count(*)`,
         max: sql<number>`coalesce(max(${expenses.amountCents}), 0)`,
         minDate: sql<string | null>`min(${expenses.spentOn})`,
-        maxDate: sql<string | null>`max(${expenses.spentOn})`,
       })
       .from(expenses)
       .where(inRange),
@@ -74,6 +101,13 @@ export async function getAnalytics(
       .from(reimbursements)
       .innerJoin(expenses, eq(expenses.id, reimbursements.expenseId))
       .where(refInRange),
+    db
+      .select({
+        total: sql<number>`coalesce(sum(${incomes.amountCents}), 0)`,
+        count: sql<number>`count(*)`,
+      })
+      .from(incomes)
+      .where(incInRange),
     db
       .select({
         categoryId: categories.id,
@@ -143,13 +177,23 @@ export async function getAnalytics(
       .groupBy(expenses.createdByUserId),
     db
       .select({
-        dow: sql<number>`extract(dow from ${expenses.spentOn})`,
+        userId: expenses.createdByUserId,
+        categoryName: categories.name,
+        gross: sql<number>`sum(${expenses.amountCents})`,
+      })
+      .from(expenses)
+      .innerJoin(categories, eq(categories.id, expenses.categoryId))
+      .where(inRange)
+      .groupBy(expenses.createdByUserId, categories.name),
+    db
+      .select({
+        d: expenses.spentOn,
         gross: sql<number>`sum(${expenses.amountCents})`,
         count: sql<number>`count(*)`,
       })
       .from(expenses)
       .where(inRange)
-      .groupBy(sql`extract(dow from ${expenses.spentOn})`),
+      .groupBy(expenses.spentOn),
     db
       .select({
         id: expenses.id,
@@ -170,50 +214,101 @@ export async function getAnalytics(
       .where(inRange)
       .orderBy(desc(expenses.amountCents))
       .limit(10),
+    db
+      .select({
+        id: incomes.id,
+        amountCents: incomes.amountCents,
+        method: incomes.method,
+        receivedOn: incomes.receivedOn,
+        categoryName: categories.name,
+        subcategoryName: subcategories.name,
+        createdBy: users.displayName,
+      })
+      .from(incomes)
+      .innerJoin(categories, eq(categories.id, incomes.categoryId))
+      .leftJoin(subcategories, eq(subcategories.id, incomes.subcategoryId))
+      .innerJoin(users, eq(users.id, incomes.createdByUserId))
+      .where(incInRange)
+      .orderBy(desc(incomes.amountCents))
+      .limit(10),
+    db
+      .select({
+        name: categories.name,
+        total: sql<number>`sum(${incomes.amountCents})`,
+        count: sql<number>`count(*)`,
+      })
+      .from(incomes)
+      .innerJoin(categories, eq(categories.id, incomes.categoryId))
+      .where(incInRange)
+      .groupBy(categories.id, categories.name)
+      .orderBy(desc(sql`sum(${incomes.amountCents})`)),
+    db
+      .select({
+        name: users.displayName,
+        email: users.email,
+        total: sql<number>`sum(${incomes.amountCents})`,
+        count: sql<number>`count(*)`,
+      })
+      .from(incomes)
+      .innerJoin(users, eq(users.id, incomes.createdByUserId))
+      .where(incInRange)
+      .groupBy(users.id, users.displayName, users.email)
+      .orderBy(desc(sql`sum(${incomes.amountCents})`)),
   ]);
 
   const grossCents = n(totalsRow[0]?.gross);
   const reimbursedCents = n(refTotalRow[0]?.total);
   const netCents = grossCents - reimbursedCents;
   const count = n(totalsRow[0]?.count);
+  const incomeCents = n(incTotalRow[0]?.total);
 
-  const minDate = totalsRow[0]?.minDate ?? from;
-  const maxDate = totalsRow[0]?.maxDate ?? to;
-  const spanDays =
-    Math.max(
-      1,
-      Math.round(
-        (new Date(maxDate).getTime() - new Date(minDate).getTime()) / 86400000,
-      ) + 1,
-    ) || 1;
+  // ---- días ----
+  const days = dayRows
+    .map((r) => ({ date: String(r.d), cents: n(r.gross), count: n(r.count) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const today = iso(new Date());
+  const lastDay = today < to ? today : to;
+  const firstDay = totalsRow[0]?.minDate
+    ? String(totalsRow[0].minDate) > from
+      ? String(totalsRow[0].minDate)
+      : from
+    : from;
+  const spanDays = Math.max(
+    1,
+    Math.round((new Date(lastDay).getTime() - new Date(firstDay).getTime()) / 86400000) + 1,
+  );
+  const daysActive = days.length;
+  const daysNoSpend = Math.max(0, spanDays - daysActive);
+  const maxDay = days.reduce(
+    (m, d) => (d.cents > m.cents ? d : m),
+    { date: "", cents: 0, count: 0 },
+  );
 
+  // ---- por día de semana (promedio) ----
+  const dowSum = Array(7).fill(0);
+  const dowDays = Array(7).fill(0);
+  days.forEach((d) => {
+    const g = new Date(d.date + "T00:00:00").getDay();
+    dowSum[g] += d.cents;
+    dowDays[g] += 1;
+  });
+  const byWeekday = Array.from({ length: 7 }, (_, dow) => ({
+    dow,
+    grossCents: dowSum[dow],
+    avgCents: dowDays[dow] ? Math.round(dowSum[dow] / dowDays[dow]) : 0,
+  }));
+
+  // ---- categorías ----
   const catRefMap = new Map(catRefRows.map((r) => [r.categoryId, n(r.refunded)]));
   const byCategory = catRows.map((r) => {
-    const gross = n(r.gross);
+    const g = n(r.gross);
     const refunded = catRefMap.get(r.categoryId) ?? 0;
     return {
       name: r.name,
-      grossCents: gross,
-      netCents: gross - refunded,
+      grossCents: g,
+      netCents: g - refunded,
       count: n(r.count),
-      pct: grossCents ? (gross / grossCents) * 100 : 0,
-    };
-  });
-
-  const memberRefMap = new Map(
-    memberRefRows.map((r) => [r.userId, n(r.refunded)]),
-  );
-  const byMember = memberRows.map((r) => {
-    const gross = n(r.gross);
-    const refunded = memberRefMap.get(r.userId) ?? 0;
-    const c = n(r.count);
-    return {
-      name: r.name ?? r.email,
-      grossCents: gross,
-      netCents: gross - refunded,
-      count: c,
-      avgTicketCents: c ? Math.round(gross / c) : 0,
-      pct: grossCents ? (gross / grossCents) * 100 : 0,
+      pct: grossCents ? (g / grossCents) * 100 : 0,
     };
   });
 
@@ -232,21 +327,67 @@ export async function getAnalytics(
     pct: grossCents ? (n(r.gross) / grossCents) * 100 : 0,
   }));
 
-  const weekdayMap = new Map(weekdayRows.map((r) => [n(r.dow), n(r.gross)]));
-  const byWeekday = Array.from({ length: 7 }, (_, i) => ({
-    dow: i,
-    grossCents: weekdayMap.get(i) ?? 0,
-  }));
+  // ---- miembros ----
+  const memberRefMap = new Map(memberRefRows.map((r) => [r.userId, n(r.refunded)]));
+  const memberCatMap = new Map<string, { name: string; cents: number }[]>();
+  memberCatRows.forEach((r) => {
+    const arr = memberCatMap.get(r.userId) ?? [];
+    arr.push({ name: r.categoryName, cents: n(r.gross) });
+    memberCatMap.set(r.userId, arr);
+  });
+  const byMember = memberRows.map((r) => {
+    const g = n(r.gross);
+    const refunded = memberRefMap.get(r.userId) ?? 0;
+    const c = n(r.count);
+    return {
+      userId: r.userId,
+      name: r.name ?? r.email,
+      grossCents: g,
+      netCents: g - refunded,
+      count: c,
+      avgTicketCents: c ? Math.round(g / c) : 0,
+      pct: grossCents ? (g / grossCents) * 100 : 0,
+      byCategory: (memberCatMap.get(r.userId) ?? []).sort((a, b) => b.cents - a.cents),
+    };
+  });
 
-  const topExpenses = topRows.map((r) => ({
-    id: r.id,
-    amountCents: r.amountCents,
-    netCents: r.amountCents - n(r.refunded),
-    paymentMethod: r.paymentMethod,
-    spentOn: r.spentOn,
-    categoryName: r.categoryName,
-    subcategoryName: r.subcategoryName,
-    createdBy: r.createdBy,
+  // ---- top movimientos (gastos + ingresos) ----
+  const topMovements = [
+    ...topExpRows.map((r) => ({
+      id: r.id,
+      kind: "gasto" as const,
+      amountCents: r.amountCents,
+      netCents: r.amountCents - n(r.refunded),
+      label: r.categoryName + (r.subcategoryName ? ` · ${r.subcategoryName}` : ""),
+      method: r.paymentMethod as string,
+      on: String(r.spentOn),
+      createdBy: r.createdBy,
+    })),
+    ...topIncRows.map((r) => ({
+      id: r.id,
+      kind: "ingreso" as const,
+      amountCents: r.amountCents,
+      netCents: r.amountCents,
+      label: r.categoryName + (r.subcategoryName ? ` · ${r.subcategoryName}` : ""),
+      method: r.method as string,
+      on: String(r.receivedOn),
+      createdBy: r.createdBy,
+    })),
+  ]
+    .sort((a, b) => b.amountCents - a.amountCents)
+    .slice(0, 8);
+
+  const incomeBySource = incSourceRows.map((r) => ({
+    name: r.name,
+    totalCents: n(r.total),
+    count: n(r.count),
+    pct: incomeCents ? (n(r.total) / incomeCents) * 100 : 0,
+  }));
+  const incomeByMember = incMemberRows.map((r) => ({
+    name: r.name ?? r.email,
+    totalCents: n(r.total),
+    count: n(r.count),
+    pct: incomeCents ? (n(r.total) / incomeCents) * 100 : 0,
   }));
 
   return {
@@ -254,23 +395,36 @@ export async function getAnalytics(
       grossCents,
       reimbursedCents,
       netCents,
+      incomeCents,
+      balanceCents: incomeCents - netCents,
       count,
+      incomeCount: n(incTotalRow[0]?.count),
       maxExpenseCents: n(totalsRow[0]?.max),
       avgTicketCents: count ? Math.round(grossCents / count) : 0,
       avgPerDayCents: Math.round(netCents / spanDays),
       refundRatePct: grossCents ? (reimbursedCents / grossCents) * 100 : 0,
       refundCount: n(refTotalRow[0]?.count),
       spanDays,
+      daysActive,
+      daysNoSpend,
+      maxDayCents: maxDay.cents,
+      maxDayDate: maxDay.date,
     },
     byCategory,
     bySubcategory,
     byPaymentMethod,
     byMember,
     byWeekday,
-    topExpenses,
+    days,
+    topMovements,
+    incomeBySource,
+    incomeByMember,
   };
 }
 
+export type Analytics = Awaited<ReturnType<typeof getAnalytics>>;
+
+// ─────────────────────────────────────────────────────────
 export async function getMonthlyTrend(
   teamId: string,
   months = 12,
@@ -279,23 +433,18 @@ export async function getMonthlyTrend(
   const start = new Date();
   start.setDate(1);
   start.setMonth(start.getMonth() - (months - 1));
-  const from = start.toISOString().slice(0, 10);
-  const byMember = memberId ? [eq(expenses.createdByUserId, memberId)] : [];
+  const from = iso(start);
+  const mE = memberId ? [eq(expenses.createdByUserId, memberId)] : [];
+  const mI = memberId ? [eq(incomes.createdByUserId, memberId)] : [];
 
-  const [spend, refunds] = await Promise.all([
+  const [spend, refunds, income] = await Promise.all([
     db
       .select({
         month: sql<string>`to_char(${expenses.spentOn}, 'YYYY-MM')`,
         gross: sql<number>`sum(${expenses.amountCents})`,
       })
       .from(expenses)
-      .where(
-        and(
-          eq(expenses.teamId, teamId),
-          gte(expenses.spentOn, from),
-          ...byMember,
-        ),
-      )
+      .where(and(eq(expenses.teamId, teamId), gte(expenses.spentOn, from), ...mE))
       .groupBy(sql`to_char(${expenses.spentOn}, 'YYYY-MM')`),
     db
       .select({
@@ -304,31 +453,101 @@ export async function getMonthlyTrend(
       })
       .from(reimbursements)
       .innerJoin(expenses, eq(expenses.id, reimbursements.expenseId))
-      .where(
-        and(
-          eq(reimbursements.teamId, teamId),
-          gte(reimbursements.reimbursedOn, from),
-          ...byMember,
-        ),
-      )
+      .where(and(eq(reimbursements.teamId, teamId), gte(reimbursements.reimbursedOn, from), ...mE))
       .groupBy(sql`to_char(${reimbursements.reimbursedOn}, 'YYYY-MM')`),
+    db
+      .select({
+        month: sql<string>`to_char(${incomes.receivedOn}, 'YYYY-MM')`,
+        total: sql<number>`sum(${incomes.amountCents})`,
+      })
+      .from(incomes)
+      .where(and(eq(incomes.teamId, teamId), gte(incomes.receivedOn, from), ...mI))
+      .groupBy(sql`to_char(${incomes.receivedOn}, 'YYYY-MM')`),
   ]);
 
-  const spendMap = new Map(spend.map((r) => [r.month, n(r.gross)]));
-  const refundMap = new Map(refunds.map((r) => [r.month, n(r.refunded)]));
+  const sMap = new Map(spend.map((r) => [r.month, n(r.gross)]));
+  const rMap = new Map(refunds.map((r) => [r.month, n(r.refunded)]));
+  const iMap = new Map(income.map((r) => [r.month, n(r.total)]));
 
   return Array.from({ length: months }, (_, i) => {
     const d = new Date(start);
     d.setMonth(d.getMonth() + i);
-    const key = d.toISOString().slice(0, 7);
-    const gross = spendMap.get(key) ?? 0;
-    const refunded = refundMap.get(key) ?? 0;
+    const key = iso(d).slice(0, 7);
+    const gross = sMap.get(key) ?? 0;
+    const refunded = rMap.get(key) ?? 0;
     return {
       month: key,
       label: d.toLocaleDateString("es-AR", { month: "short" }).replace(".", ""),
       grossCents: gross,
       reimbursedCents: refunded,
       netCents: gross - refunded,
+      incomeCents: iMap.get(key) ?? 0,
     };
   });
 }
+
+export type MonthlyTrend = Awaited<ReturnType<typeof getMonthlyTrend>>;
+
+// ─────────────────────────────────────────────────────────
+/** Ritmo del mes en curso vs el anterior (gasto neto acumulado por día). */
+export async function getSpendPace(teamId: string, memberId?: string) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const dom = now.getDate();
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const daysPrevMonth = new Date(y, m, 0).getDate();
+  const prevStart = iso(new Date(y, m - 1, 1));
+  const mE = memberId ? [eq(expenses.createdByUserId, memberId)] : [];
+
+  const [expRows, refRows] = await Promise.all([
+    db
+      .select({ d: expenses.spentOn, amount: sql<number>`sum(${expenses.amountCents})` })
+      .from(expenses)
+      .where(and(eq(expenses.teamId, teamId), gte(expenses.spentOn, prevStart), ...mE))
+      .groupBy(expenses.spentOn),
+    db
+      .select({ d: reimbursements.reimbursedOn, amount: sql<number>`sum(${reimbursements.amountCents})` })
+      .from(reimbursements)
+      .innerJoin(expenses, eq(expenses.id, reimbursements.expenseId))
+      .where(and(eq(reimbursements.teamId, teamId), gte(reimbursements.reimbursedOn, prevStart), ...mE))
+      .groupBy(reimbursements.reimbursedOn),
+  ]);
+
+  const net: Record<string, number> = {};
+  expRows.forEach((r) => (net[String(r.d)] = (net[String(r.d)] || 0) + n(r.amount)));
+  refRows.forEach((r) => (net[String(r.d)] = (net[String(r.d)] || 0) - n(r.amount)));
+
+  const curKey = iso(new Date(y, m, 1)).slice(0, 7);
+  const prevKey = iso(new Date(y, m - 1, 1)).slice(0, 7);
+  const curDaily = Array(daysInMonth).fill(0);
+  const prevDaily = Array(daysPrevMonth).fill(0);
+  Object.entries(net).forEach(([d, v]) => {
+    const day = Number(d.slice(8, 10)) - 1;
+    if (d.slice(0, 7) === curKey && day < daysInMonth) curDaily[day] += v;
+    else if (d.slice(0, 7) === prevKey && day < daysPrevMonth) prevDaily[day] += v;
+  });
+  const cum = (a: number[]) => a.reduce<number[]>((acc, v, i) => (acc.push((acc[i - 1] || 0) + v), acc), []);
+  const curCum = cum(curDaily).slice(0, dom);
+  const prevCum = cum(prevDaily);
+
+  const curTotal = curCum[curCum.length - 1] || 0;
+  const prevToDate = prevCum[Math.min(dom, prevCum.length) - 1] || 0;
+  const dailyRate = curTotal / dom;
+
+  return {
+    daysInMonth,
+    dom,
+    curCum,
+    prevCum,
+    curTotalCents: curTotal,
+    prevToDateCents: prevToDate,
+    prevFullCents: prevCum[prevCum.length - 1] || 0,
+    projectionCents: Math.round(dailyRate * daysInMonth),
+    vsPrevPct: prevToDate ? ((curTotal - prevToDate) / prevToDate) * 100 : 0,
+    monthLabel: new Date(y, m, 1).toLocaleDateString("es-AR", { month: "long" }),
+    prevMonthLabel: new Date(y, m - 1, 1).toLocaleDateString("es-AR", { month: "long" }),
+  };
+}
+
+export type SpendPace = Awaited<ReturnType<typeof getSpendPace>>;
