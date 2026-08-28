@@ -1,17 +1,18 @@
 import { revalidatePath } from "next/cache";
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
   expenses,
   incomes,
+  pendingMovements,
   reimbursements,
   teamMembers,
   telegramLinks,
 } from "@/db/schema";
 import { insertExpense } from "@/lib/expenses-core";
 import { insertIncome } from "@/lib/income-core";
-import { parseExpenseMessage } from "@/lib/gemini";
+import { parseExpenseMessage, type ParsedMovement } from "@/lib/gemini";
 import { formatCents } from "@/lib/money";
 import {
   PAYMENT_METHODS,
@@ -149,6 +150,100 @@ function renderMovement(a: {
   return { text: lines.join("\n"), keyboard: kb };
 }
 
+type Commit = { text: string; keyboard: Btn[][] } | { errorMsg: string };
+
+/** Crea el gasto/ingreso a partir de un parseo y devuelve el mensaje a mostrar. */
+async function commitMovement(
+  teamId: string,
+  userId: string,
+  kind: "gasto" | "ingreso",
+  p: ParsedMovement,
+  expCats: Cat[],
+  incCats: Cat[],
+): Promise<Commit> {
+  const amountCents = Math.round((p.amount ?? 0) * 100);
+  const on = /^\d{4}-\d{2}-\d{2}$/.test(p.spentOn) ? p.spentOn : today();
+  const rev = () => {
+    revalidatePath("/");
+    revalidatePath("/movimientos");
+    revalidatePath("/analytics");
+  };
+
+  if (kind === "ingreso") {
+    const cat = resolveCategory(incCats, p.category);
+    if (!cat)
+      return {
+        errorMsg:
+          "No tenés fuentes de ingreso cargadas. Creá alguna en la app (Categorías → Ingresos).",
+      };
+    const sub =
+      cat.subcategories.find((s) => norm(s.name) === norm(p.subcategory)) ?? null;
+    const stated = (INCOME_METHODS as readonly string[]).includes(
+      p.paymentMethod,
+    );
+    const method: IncomeMethod = stated
+      ? (p.paymentMethod as IncomeMethod)
+      : "transferencia";
+    const { id } = await insertIncome(teamId, userId, {
+      amountCents,
+      categoryId: cat.id,
+      subcategoryId: sub?.id ?? null,
+      method,
+      description: p.description || null,
+      receivedOn: on,
+    });
+    rev();
+    return renderMovement({
+      kind: "ingreso",
+      id,
+      confidence: p.confidence,
+      amountCents,
+      catName: cat.name,
+      subName: sub?.name ?? null,
+      method: stated ? method : null,
+      reimbursedCents: null,
+      description: p.description || null,
+      on,
+      note: p.note,
+    });
+  }
+
+  const cat = resolveCategory(expCats, p.category);
+  if (!cat)
+    return { errorMsg: "El equipo no tiene categorías. Creá alguna en la app." };
+  const sub =
+    cat.subcategories.find((s) => norm(s.name) === norm(p.subcategory)) ?? null;
+  const stated = (PAYMENT_METHODS as readonly string[]).includes(p.paymentMethod);
+  const method: PaymentMethod = stated
+    ? (p.paymentMethod as PaymentMethod)
+    : "efectivo";
+  const reimbursedCents =
+    p.reimbursed > 0 ? Math.round(p.reimbursed * 100) : null;
+  const { id } = await insertExpense(teamId, userId, {
+    amountCents,
+    categoryId: cat.id,
+    subcategoryId: sub?.id ?? null,
+    paymentMethod: method,
+    description: p.description || null,
+    spentOn: on,
+    reimbursedCents,
+  });
+  rev();
+  return renderMovement({
+    kind: "gasto",
+    id,
+    confidence: p.confidence,
+    amountCents,
+    catName: cat.name,
+    subName: sub?.name ?? null,
+    method: stated ? method : null,
+    reimbursedCents,
+    description: p.description || null,
+    on,
+    note: p.note,
+  });
+}
+
 async function linkedUser(telegramUserId: number) {
   const [row] = await db
     .select()
@@ -274,108 +369,46 @@ export async function POST(req: Request) {
     }
 
     const amountCents = Math.round(parsed.amount * 100);
-    const on = /^\d{4}-\d{2}-\d{2}$/.test(parsed.spentOn)
-      ? parsed.spentOn
-      : today();
 
-    const revalidate = () => {
-      revalidatePath("/");
-      revalidatePath("/movimientos");
-      revalidatePath("/analytics");
-    };
-
-    if (parsed.kind === "ingreso") {
-      const cat = resolveCategory(incCats, parsed.category);
-      if (!cat) {
-        await sendMessage(
-          chatId,
-          "No tenés fuentes de ingreso cargadas. Creá alguna en la app (Categorías → Ingresos).",
+    // ── no se entiende si es gasto o ingreso → preguntar ──
+    if (!parsed.kindClear) {
+      await db
+        .delete(pendingMovements)
+        .where(
+          lt(pendingMovements.createdAt, new Date(Date.now() - 2 * 86400000)),
         );
-        return OK();
-      }
-      const sub =
-        cat.subcategories.find((s) => norm(s.name) === norm(parsed.subcategory)) ??
-        null;
-      const stated = (INCOME_METHODS as readonly string[]).includes(
-        parsed.paymentMethod,
-      );
-      const method: IncomeMethod = stated
-        ? (parsed.paymentMethod as IncomeMethod)
-        : "transferencia"; // provisorio hasta que elija
-
-      const { id } = await insertIncome(teamId, link.userId, {
-        amountCents,
-        categoryId: cat.id,
-        subcategoryId: sub?.id ?? null,
-        method,
-        description: parsed.description || null,
-        receivedOn: on,
-      });
-      revalidate();
-
-      const rm = renderMovement({
-        kind: "ingreso",
-        id,
-        confidence: parsed.confidence,
-        amountCents,
-        catName: cat.name,
-        subName: sub?.name ?? null,
-        method: stated ? method : null,
-        reimbursedCents: null,
-        description: parsed.description || null,
-        on,
-        note: parsed.note,
-      });
-      await sendMessage(chatId, rm.text, rm.keyboard);
-      return OK();
-    }
-
-    // gasto
-    const cat = resolveCategory(expCats, parsed.category);
-    if (!cat) {
+      const [p] = await db
+        .insert(pendingMovements)
+        .values({ teamId, userId: link.userId, payload: parsed })
+        .returning({ id: pendingMovements.id });
       await sendMessage(
         chatId,
-        "El equipo no tiene categorías. Creá alguna en la app.",
+        `🤔 <b>${formatCents(amountCents)}</b>${
+          parsed.description ? ` · ${parsed.description}` : ""
+        }\n¿Fue un <b>gasto</b> o un <b>ingreso</b>?`,
+        [
+          [
+            { text: "🔻 Gasto", callback_data: `pk:${p.id}:gasto` },
+            { text: "💰 Ingreso", callback_data: `pk:${p.id}:ingreso` },
+          ],
+        ],
       );
       return OK();
     }
-    const sub =
-      cat.subcategories.find((s) => norm(s.name) === norm(parsed.subcategory)) ??
-      null;
-    const stated = (PAYMENT_METHODS as readonly string[]).includes(
-      parsed.paymentMethod,
+
+    const res = await commitMovement(
+      teamId,
+      link.userId,
+      parsed.kind,
+      parsed,
+      expCats,
+      incCats,
     );
-    const method: PaymentMethod = stated
-      ? (parsed.paymentMethod as PaymentMethod)
-      : "efectivo"; // provisorio hasta que elija
-    const reimbursedCents =
-      parsed.reimbursed > 0 ? Math.round(parsed.reimbursed * 100) : null;
-
-    const { id } = await insertExpense(teamId, link.userId, {
-      amountCents,
-      categoryId: cat.id,
-      subcategoryId: sub?.id ?? null,
-      paymentMethod: method,
-      description: parsed.description || null,
-      spentOn: on,
-      reimbursedCents,
-    });
-    revalidate();
-
-    const rm = renderMovement({
-      kind: "gasto",
-      id,
-      confidence: parsed.confidence,
-      amountCents,
-      catName: cat.name,
-      subName: sub?.name ?? null,
-      method: stated ? method : null,
-      reimbursedCents,
-      description: parsed.description || null,
-      on,
-      note: parsed.note,
-    });
-    await sendMessage(chatId, rm.text, rm.keyboard);
+    if ("errorMsg" in res) {
+      await sendMessage(chatId, res.errorMsg);
+      return OK();
+    }
+    await sendMessage(chatId, res.text, res.keyboard);
   } catch (err) {
     console.error("telegram webhook error:", err);
     try {
@@ -411,6 +444,46 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
     return;
   }
   const teamId = (await teamOf(link.userId)) ?? "";
+
+  // ── responder "¿gasto o ingreso?" ──
+  if (data.startsWith("pk:")) {
+    const [, pid, k] = data.split(":");
+    const kind = k === "ingreso" ? "ingreso" : "gasto";
+    const [pend] = await db
+      .select()
+      .from(pendingMovements)
+      .where(
+        and(
+          eq(pendingMovements.id, pid),
+          eq(pendingMovements.userId, link.userId),
+        ),
+      )
+      .limit(1);
+    if (!pend) {
+      await answerCallbackQuery(cq.id, "Ese movimiento ya se cargó o venció.");
+      return;
+    }
+    const [expCats, incCats] = await Promise.all([
+      getActiveCategories(pend.teamId, "expense"),
+      getActiveCategories(pend.teamId, "income"),
+    ]);
+    const res = await commitMovement(
+      pend.teamId,
+      link.userId,
+      kind,
+      pend.payload as ParsedMovement,
+      expCats,
+      incCats,
+    );
+    await db.delete(pendingMovements).where(eq(pendingMovements.id, pid));
+    if ("errorMsg" in res) {
+      await editMessageText(chatId, messageId, res.errorMsg);
+    } else {
+      await editMessageText(chatId, messageId, res.text, res.keyboard);
+    }
+    await answerCallbackQuery(cq.id, kind === "ingreso" ? "Ingreso" : "Gasto");
+    return;
+  }
 
   // ── elegir forma de pago / medio de un movimiento recién cargado ──
   if (data.startsWith("setm:") || data.startsWith("seti:")) {

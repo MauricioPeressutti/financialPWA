@@ -9,6 +9,7 @@ const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODE
 
 export type ParsedMovement = {
   kind: "gasto" | "ingreso";
+  kindClear: boolean; // false => hay que preguntarle al usuario
   amount: number | null;
   category: string;
   subcategory: string;
@@ -63,8 +64,11 @@ export async function parseExpenseMessage(
     "PRIMERO decidí el tipo:",
     '- "ingreso": entró plata. Señales: "cobré", "me pagaron", "me depositaron", "entró",',
     '  "vendí", "sueldo", "aguinaldo", "me transfirieron", "factura cobrada".',
-    '- "gasto": salió plata (por defecto si hay duda). Señales: "gasté", "pagué", "compré",',
-    '  "saqué", "me salió".',
+    '- "gasto": salió plata. Señales: "gasté", "pagué", "compré", "saqué", "me salió",',
+    '  o un rubro típico de gasto ("super", "nafta", "farmacia", "receta", "bar").',
+    'kindClear = true SOLO si hay un verbo o una palabra que deja claro el tipo.',
+    'Si el mensaje es solo "<monto> <cosa>" sin verbo y la cosa podría ser cobro o gasto',
+    '(ej: "5 en una receta", "8000 clase de inglés", "3000 Juan"), poné kind = "gasto" y kindClear = false.',
     "",
     'Categorías de GASTO (usá el nombre EXACTO, o "" si ninguna encaja):',
     fmtTree(opts.expenseCategories),
@@ -100,6 +104,7 @@ export async function parseExpenseMessage(
         type: "object",
         properties: {
           kind: { type: "string", enum: ["gasto", "ingreso"] },
+          kindClear: { type: "boolean" },
           amount: { type: "number", nullable: true },
           category: { type: "string" },
           subcategory: { type: "string" },
@@ -110,7 +115,14 @@ export async function parseExpenseMessage(
           confidence: { type: "string", enum: ["alta", "media", "baja"] },
           note: { type: "string" },
         },
-        required: ["kind", "amount", "category", "paymentMethod", "confidence"],
+        required: [
+          "kind",
+          "kindClear",
+          "amount",
+          "category",
+          "paymentMethod",
+          "confidence",
+        ],
       },
     },
   };
@@ -136,6 +148,7 @@ export async function parseExpenseMessage(
     const p = JSON.parse(jsonText) as Partial<ParsedMovement>;
     return {
       kind: p.kind === "ingreso" ? "ingreso" : "gasto",
+      kindClear: p.kindClear !== false,
       amount: typeof p.amount === "number" ? p.amount : null,
       category: p.category ?? "",
       subcategory: p.subcategory ?? "",
