@@ -364,15 +364,20 @@ export function WhoInvites({ players }: { players: Player[] }) {
       {open && (
         <div
           className={cn(
-            "fixed inset-0 z-50 flex flex-col p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))] duration-300 animate-in fade-in slide-in-from-bottom-8",
+            "fixed inset-0 z-50 flex flex-col bg-background p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1.25rem+env(safe-area-inset-bottom))] duration-300 animate-in fade-in slide-in-from-bottom-8",
             shake && "qi-shake",
           )}
-          style={{
-            background:
-              "radial-gradient(420px 300px at 50% 22%, #1b2c4e 0%, transparent 70%), linear-gradient(180deg, #0c1428, #070b1a)",
-          }}
         >
-          <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
+          {/* misma vineta cosmica que usa el fondo de la app */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(120% 90% at 50% 30%, transparent 44%, var(--cosmic-vignette) 100%)",
+            }}
+          />
+          <div className="relative mx-auto flex w-full max-w-md flex-1 flex-col">
             <div className="flex items-center justify-between">
               <b className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-primary">
                 {phase === "result" ? "Resultado" : "Ronda de hoy"}
