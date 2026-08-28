@@ -12,6 +12,8 @@ const DEFAULT_CATEGORIES: Record<string, string[]> = {
   Transporte: ["Nafta", "SUBE", "Taxi/App", "Mantenimiento"],
   Delivery: ["Rappi", "PedidosYa", "Uber Eats", "Otro"],
   Salud: ["Farmacia", "Obra social", "Consultas"],
+  "Farmacia online": [],
+  Kiosco: [],
   Ocio: ["Salidas", "Streaming", "Viajes"],
   Otros: [],
 };
