@@ -35,12 +35,15 @@ export function editMessageText(
   chatId: string | number,
   messageId: number,
   text: string,
+  buttons?: InlineButton[][],
 ) {
   return call("editMessageText", {
     chat_id: chatId,
     message_id: messageId,
     text,
     parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup: { inline_keyboard: buttons ?? [] },
   });
 }
 

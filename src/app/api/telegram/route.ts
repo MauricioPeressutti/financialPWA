@@ -23,7 +23,7 @@ import {
   incomeMethodMeta,
   type IncomeMethod,
 } from "@/lib/income-methods";
-import { getActiveCategories } from "@/lib/queries";
+import { getActiveCategories, getExpense, getIncome } from "@/lib/queries";
 import {
   answerCallbackQuery,
   editMessageText,
@@ -86,6 +86,66 @@ function resolveCategory(cats: Cat[], name: string) {
     cat = cats.find((c) => norm(c.name).includes(norm(name)));
   if (!cat) cat = cats.find((c) => norm(c.name) === "otros") ?? cats[0];
   return cat ?? null;
+}
+
+type Btn = { text: string; callback_data: string };
+
+/** Arma el texto de confirmación + teclado de un movimiento ya cargado. */
+function renderMovement(a: {
+  kind: "gasto" | "ingreso";
+  id: string;
+  confidence?: "alta" | "media" | "baja";
+  amountCents: number;
+  catName: string;
+  subName: string | null;
+  method: string | null; // null = todavía sin elegir
+  reimbursedCents: number | null;
+  description: string | null;
+  on: string;
+  note?: string | null;
+}): { text: string; keyboard: Btn[][] } {
+  const income = a.kind === "ingreso";
+  const meta = (
+    income ? incomeMethodMeta : paymentMethodMeta
+  ) as Record<string, { label: string }>;
+  const conf =
+    a.confidence === "media" || a.confidence === "baja"
+      ? "⚠️"
+      : a.method
+        ? "✅"
+        : "🟡";
+  const methodPart = a.method
+    ? ` · ${meta[a.method].label}`
+    : " · <i>¿con qué?</i>";
+
+  const lines = [
+    `${conf} ${income ? "💰 " : ""}<b>${income ? "+" : ""}${formatCents(a.amountCents)}</b> · ${a.catName}${a.subName ? ` · ${a.subName}` : ""}${methodPart}`,
+  ];
+  if (a.reimbursedCents)
+    lines.push(`↩️ reintegro ${formatCents(a.reimbursedCents)}`);
+  if (a.description) lines.push(`<i>${a.description}</i>`);
+  if (a.on !== today()) lines.push(`📅 ${a.on}`);
+  if ((a.confidence === "media" || a.confidence === "baja") && a.note)
+    lines.push(`\n<i>${a.note}</i>`);
+
+  const kb: Btn[][] = [];
+  if (!a.method) {
+    const methods = income ? INCOME_METHODS : PAYMENT_METHODS;
+    const prefix = income ? "seti" : "setm";
+    let row: Btn[] = [];
+    for (const m of methods) {
+      row.push({ text: meta[m].label, callback_data: `${prefix}:${a.id}:${m}` });
+      if (row.length === 2) {
+        kb.push(row);
+        row = [];
+      }
+    }
+    if (row.length) kb.push(row);
+  }
+  kb.push([
+    { text: "🗑️ Borrar", callback_data: `${income ? "dinc" : "del"}:${a.id}` },
+  ]);
+  return { text: lines.join("\n"), keyboard: kb };
 }
 
 async function linkedUser(telegramUserId: number) {
@@ -216,8 +276,12 @@ export async function POST(req: Request) {
     const on = /^\d{4}-\d{2}-\d{2}$/.test(parsed.spentOn)
       ? parsed.spentOn
       : today();
-    const conf = parsed.confidence === "alta" ? "✅" : "⚠️";
-    const dateLine = on !== today() ? `📅 ${on}` : "";
+
+    const revalidate = () => {
+      revalidatePath("/");
+      revalidatePath("/movimientos");
+      revalidatePath("/analytics");
+    };
 
     if (parsed.kind === "ingreso") {
       const cat = resolveCategory(incCats, parsed.category);
@@ -231,11 +295,12 @@ export async function POST(req: Request) {
       const sub =
         cat.subcategories.find((s) => norm(s.name) === norm(parsed.subcategory)) ??
         null;
-      const method: IncomeMethod = (
-        INCOME_METHODS as readonly string[]
-      ).includes(parsed.paymentMethod)
+      const stated = (INCOME_METHODS as readonly string[]).includes(
+        parsed.paymentMethod,
+      );
+      const method: IncomeMethod = stated
         ? (parsed.paymentMethod as IncomeMethod)
-        : "transferencia";
+        : "transferencia"; // provisorio hasta que elija
 
       const { id } = await insertIncome(teamId, link.userId, {
         amountCents,
@@ -245,24 +310,22 @@ export async function POST(req: Request) {
         description: parsed.description || null,
         receivedOn: on,
       });
+      revalidate();
 
-      revalidatePath("/");
-      revalidatePath("/movimientos");
-      revalidatePath("/analytics");
-
-      const lines = [
-        `${conf} 💰 <b>+${formatCents(amountCents)}</b> · ${cat.name}${
-          sub ? ` · ${sub.name}` : ""
-        } · ${incomeMethodMeta[method].label}`,
-      ];
-      if (parsed.description) lines.push(`<i>${parsed.description}</i>`);
-      if (dateLine) lines.push(dateLine);
-      if (parsed.confidence !== "alta" && parsed.note)
-        lines.push(`\n<i>${parsed.note}</i>`);
-
-      await sendMessage(chatId, lines.join("\n"), [
-        [{ text: "🗑️ Borrar", callback_data: `dinc:${id}` }],
-      ]);
+      const rm = renderMovement({
+        kind: "ingreso",
+        id,
+        confidence: parsed.confidence,
+        amountCents,
+        catName: cat.name,
+        subName: sub?.name ?? null,
+        method: stated ? method : null,
+        reimbursedCents: null,
+        description: parsed.description || null,
+        on,
+        note: parsed.note,
+      });
+      await sendMessage(chatId, rm.text, rm.keyboard);
       return OK();
     }
 
@@ -278,11 +341,12 @@ export async function POST(req: Request) {
     const sub =
       cat.subcategories.find((s) => norm(s.name) === norm(parsed.subcategory)) ??
       null;
-    const method: PaymentMethod = (
-      PAYMENT_METHODS as readonly string[]
-    ).includes(parsed.paymentMethod)
+    const stated = (PAYMENT_METHODS as readonly string[]).includes(
+      parsed.paymentMethod,
+    );
+    const method: PaymentMethod = stated
       ? (parsed.paymentMethod as PaymentMethod)
-      : "efectivo";
+      : "efectivo"; // provisorio hasta que elija
     const reimbursedCents =
       parsed.reimbursed > 0 ? Math.round(parsed.reimbursed * 100) : null;
 
@@ -295,26 +359,22 @@ export async function POST(req: Request) {
       spentOn: on,
       reimbursedCents,
     });
+    revalidate();
 
-    revalidatePath("/");
-    revalidatePath("/movimientos");
-    revalidatePath("/analytics");
-
-    const lines = [
-      `${conf} <b>${formatCents(amountCents)}</b> · ${cat.name}${
-        sub ? ` · ${sub.name}` : ""
-      } · ${paymentMethodMeta[method].label}`,
-    ];
-    if (reimbursedCents)
-      lines.push(`↩️ reintegro ${formatCents(reimbursedCents)}`);
-    if (parsed.description) lines.push(`<i>${parsed.description}</i>`);
-    if (dateLine) lines.push(dateLine);
-    if (parsed.confidence !== "alta" && parsed.note)
-      lines.push(`\n<i>${parsed.note}</i>`);
-
-    await sendMessage(chatId, lines.join("\n"), [
-      [{ text: "🗑️ Borrar", callback_data: `del:${id}` }],
-    ]);
+    const rm = renderMovement({
+      kind: "gasto",
+      id,
+      confidence: parsed.confidence,
+      amountCents,
+      catName: cat.name,
+      subName: sub?.name ?? null,
+      method: stated ? method : null,
+      reimbursedCents,
+      description: parsed.description || null,
+      on,
+      note: parsed.note,
+    });
+    await sendMessage(chatId, rm.text, rm.keyboard);
   } catch (err) {
     console.error("telegram webhook error:", err);
     try {
@@ -344,6 +404,83 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
     return;
   }
 
+  const link = await linkedUser(cq.from.id);
+  if (!link) {
+    await answerCallbackQuery(cq.id, "No estás vinculado.");
+    return;
+  }
+  const teamId = (await teamOf(link.userId)) ?? "";
+
+  // ── elegir forma de pago / medio de un movimiento recién cargado ──
+  if (data.startsWith("setm:") || data.startsWith("seti:")) {
+    const income = data.startsWith("seti:");
+    const [, mid, m] = data.split(":");
+    const valid = (
+      income ? INCOME_METHODS : PAYMENT_METHODS
+    ) as readonly string[];
+    if (!valid.includes(m)) {
+      await answerCallbackQuery(cq.id);
+      return;
+    }
+    if (income) {
+      const upd = await db
+        .update(incomes)
+        .set({ method: m as IncomeMethod, updatedAt: new Date() })
+        .where(and(eq(incomes.id, mid), eq(incomes.teamId, teamId)))
+        .returning({ id: incomes.id });
+      if (!upd.length) {
+        await answerCallbackQuery(cq.id, "Ese ingreso ya no está.");
+        return;
+      }
+      const row = await getIncome(teamId, mid);
+      if (row) {
+        const { text, keyboard } = renderMovement({
+          kind: "ingreso",
+          id: mid,
+          amountCents: row.amountCents,
+          catName: row.categoryName,
+          subName: row.subcategoryName,
+          method: row.method,
+          reimbursedCents: null,
+          description: row.description,
+          on: String(row.receivedOn),
+        });
+        await editMessageText(chatId, messageId, text, keyboard);
+      }
+    } else {
+      const upd = await db
+        .update(expenses)
+        .set({ paymentMethod: m as PaymentMethod, updatedAt: new Date() })
+        .where(and(eq(expenses.id, mid), eq(expenses.teamId, teamId)))
+        .returning({ id: expenses.id });
+      if (!upd.length) {
+        await answerCallbackQuery(cq.id, "Ese gasto ya no está.");
+        return;
+      }
+      const row = await getExpense(teamId, mid);
+      if (row) {
+        const reimb = row.reimbursements.reduce((s, r) => s + r.amountCents, 0);
+        const { text, keyboard } = renderMovement({
+          kind: "gasto",
+          id: mid,
+          amountCents: row.amountCents,
+          catName: row.categoryName,
+          subName: row.subcategoryName,
+          method: row.paymentMethod,
+          reimbursedCents: reimb || null,
+          description: row.description,
+          on: String(row.spentOn),
+        });
+        await editMessageText(chatId, messageId, text, keyboard);
+      }
+    }
+    revalidatePath("/");
+    revalidatePath("/movimientos");
+    revalidatePath("/analytics");
+    await answerCallbackQuery(cq.id, "Listo");
+    return;
+  }
+
   const isIncome = data.startsWith("dinc:");
   const isExpense = data.startsWith("del:");
   if (!isIncome && !isExpense) {
@@ -352,12 +489,6 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
   }
 
   const id = data.slice(data.indexOf(":") + 1);
-  const link = await linkedUser(cq.from.id);
-  if (!link) {
-    await answerCallbackQuery(cq.id, "No estás vinculado.");
-    return;
-  }
-  const teamId = (await teamOf(link.userId)) ?? "";
 
   if (isIncome) {
     const del = await db
