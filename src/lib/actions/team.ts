@@ -11,6 +11,7 @@ import {
   ACTIVE_TEAM_COOKIE,
   assertMembership,
   getCurrentUser,
+  getUserTeams,
   requireTeam,
 } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/firebase/admin";
@@ -67,6 +68,37 @@ export async function leaveTeam(): Promise<ActionResult> {
 
   const store = await cookies();
   store.delete(ACTIVE_TEAM_COOKIE);
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
+/** Elimina el equipo entero (cascade: gastos, ingresos, categorías, objetivos…). Solo owner. */
+export async function deleteTeam(confirmName: string): Promise<ActionResult> {
+  const { user, team } = await requireTeam();
+  const role = await assertMembership(user.id, team.id);
+  if (role !== "owner")
+    return { ok: false, error: "Solo el owner puede eliminar el equipo" };
+
+  const myTeams = await getUserTeams(user.id);
+  if (myTeams.length <= 1)
+    return { ok: false, error: "Es tu único equipo, no lo podés eliminar" };
+
+  if (confirmName.trim() !== team.name)
+    return { ok: false, error: "El nombre no coincide" };
+
+  await db.delete(teams).where(eq(teams.id, team.id));
+
+  const store = await cookies();
+  const other = myTeams.find((t) => t.id !== team.id);
+  if (other) {
+    store.set(ACTIVE_TEAM_COOKIE, other.id, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  } else {
+    store.delete(ACTIVE_TEAM_COOKIE);
+  }
+
   revalidatePath("/", "layout");
   return { ok: true };
 }

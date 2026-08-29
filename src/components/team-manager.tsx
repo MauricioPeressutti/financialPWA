@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   createInviteLink,
+  deleteTeam,
   leaveTeam,
   removeMember,
   renameTeam,
@@ -96,6 +97,7 @@ export function TeamManager({
   currency,
   effortEnabled,
   goalsEnabled,
+  canDelete,
 }: {
   isOwner: boolean;
   currentUserId: string;
@@ -106,6 +108,7 @@ export function TeamManager({
   currency: CurrencySettings;
   effortEnabled: boolean;
   goalsEnabled: boolean;
+  canDelete: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -117,6 +120,8 @@ export function TeamManager({
   const [tgUrl, setTgUrl] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<Member | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmDeleteTeam, setConfirmDeleteTeam] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState("");
 
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
   const inviteFullUrl = (token: string) =>
@@ -482,6 +487,39 @@ export function TeamManager({
         </div>
       )}
 
+      {/* ── Zona de peligro (owner) ── */}
+      {isOwner && (
+        <section className="rounded-2xl border border-destructive/30 bg-destructive/[0.04] p-4">
+          <p className="text-sm font-semibold text-destructive">
+            Eliminar equipo
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            Borra <b>{team.name}</b> y todo lo que tiene dentro: gastos, ingresos,
+            categorías, objetivos y saldos.
+            {members.length > 1 && (
+              <> Los otros {members.length - 1} miembros pierden acceso.</>
+            )}{" "}
+            No se puede deshacer.
+          </p>
+          {canDelete ? (
+            <Button
+              variant="outline"
+              className="mt-3 border-destructive/40 text-destructive hover:bg-destructive/10"
+              onClick={() => {
+                setDeleteConfirm("");
+                setConfirmDeleteTeam(true);
+              }}
+            >
+              Eliminar equipo
+            </Button>
+          ) : (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Es tu único equipo, no lo podés eliminar.
+            </p>
+          )}
+        </section>
+      )}
+
       {/* ── Diálogos ── */}
       <Dialog
         open={!!confirmRemove}
@@ -551,6 +589,52 @@ export function TeamManager({
               }
             >
               Salir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmDeleteTeam}
+        onOpenChange={(o) => {
+          setConfirmDeleteTeam(o);
+          if (!o) setDeleteConfirm("");
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar {team.name}?</DialogTitle>
+            <DialogDescription>
+              Se borra todo el equipo y no se puede recuperar. Escribí{" "}
+              <b className="text-foreground">{team.name}</b> para confirmar.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={deleteConfirm}
+            autoFocus
+            placeholder={team.name}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+          />
+          <DialogFooter>
+            <DialogClose render={<Button variant="outline">Cancelar</Button>} />
+            <Button
+              variant="destructive"
+              disabled={pending || deleteConfirm.trim() !== team.name}
+              onClick={() =>
+                startTransition(async () => {
+                  const r = await deleteTeam(deleteConfirm);
+                  if (!r.ok) {
+                    toast.error(r.error);
+                    return;
+                  }
+                  setConfirmDeleteTeam(false);
+                  toast.success("Equipo eliminado");
+                  router.push("/");
+                  router.refresh();
+                })
+              }
+            >
+              Eliminar equipo
             </Button>
           </DialogFooter>
         </DialogContent>
