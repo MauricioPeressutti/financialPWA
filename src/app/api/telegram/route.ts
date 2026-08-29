@@ -15,7 +15,11 @@ import { isCurrency } from "@/lib/currencies";
 import { insertExpense } from "@/lib/expenses-core";
 import { insertIncome } from "@/lib/income-core";
 import { fxForMovement } from "@/lib/fx";
-import { parseExpenseMessage, type ParsedMovement } from "@/lib/gemini";
+import {
+  parseExpenseMessage,
+  parseReceiptImage,
+  type ParsedMovement,
+} from "@/lib/gemini";
 import { formatCents, formatMoney } from "@/lib/money";
 import {
   PAYMENT_METHODS,
@@ -31,6 +35,8 @@ import { getActiveCategories, getExpense, getIncome } from "@/lib/queries";
 import {
   answerCallbackQuery,
   editMessageText,
+  getTelegramFile,
+  sendChatAction,
   sendMessage,
   type TgUpdate,
 } from "@/lib/telegram";
@@ -55,6 +61,10 @@ const HELP = [
   "· <i>cobré el sueldo, 900 mil por transferencia</i>",
   "· <i>vendí una torta, entraron 15000 en efectivo</i>",
   "· <i>me depositaron 50 mil de un freelance</i>",
+  "",
+  "<b>📸 Sacale una foto al comprobante</b>",
+  "Mandame la foto del ticket, la factura o la captura de la transferencia y lo cargo solo.",
+  "Podés agregarle un texto de aclaración a la foto (ej: <i>“fue con la de crédito”</i>).",
   "",
   "Yo saco solo el monto, la categoría, la forma de pago y la fecha. Si algo no me queda claro te aviso.",
   "Después de cada carga te dejo un botón <b>🗑️ Borrar</b> por si me equivoqué.",
@@ -326,9 +336,19 @@ export async function POST(req: Request) {
     }
 
     const msg = update.message;
-    if (!msg?.text || !msg.from) return OK();
+    if (!msg?.from) return OK();
     const chatId = msg.chat.id;
-    const text = msg.text.trim();
+    const text = msg.text?.trim() ?? "";
+
+    const photo = msg.photo?.length ? msg.photo[msg.photo.length - 1] : null;
+    const doc =
+      msg.document &&
+      /^(image\/|application\/pdf)/.test(msg.document.mime_type ?? "")
+        ? msg.document
+        : null;
+    const fileId = photo?.file_id ?? doc?.file_id ?? null;
+
+    if (!text && !fileId) return OK();
 
     // ── /start <code>  → vincular cuenta ──────────────────
     const startMatch = text.match(/^\/start(?:@\w+)?\s+([A-Za-z0-9_-]{6,})/);
@@ -390,16 +410,37 @@ export async function POST(req: Request) {
         subcategories: c.subcategories.map((s) => ({ name: s.name })),
       }));
 
-    const parsed = await parseExpenseMessage(text, {
+    const parseOpts = {
       expenseCategories: toTree(expCats),
       incomeCategories: toTree(incCats),
       today: today(),
-    });
+    };
+
+    let parsed: ParsedMovement | null;
+    if (fileId) {
+      await sendChatAction(chatId, "typing");
+      const file = await getTelegramFile(fileId);
+      if (!file) {
+        await sendMessage(
+          chatId,
+          "No pude bajar la imagen (¿muy pesada?). Sacá una foto más liviana o cargalo por texto.",
+        );
+        return OK();
+      }
+      parsed = await parseReceiptImage(
+        { ...file, caption: msg.caption?.trim() },
+        parseOpts,
+      );
+    } else {
+      parsed = await parseExpenseMessage(text, parseOpts);
+    }
 
     if (!parsed || parsed.amount === null || parsed.amount <= 0) {
       await sendMessage(
         chatId,
-        "No pude sacar el monto. Probá algo como <i>“5000 super débito”</i> o <i>“cobré 30000 por transferencia”</i>.",
+        fileId
+          ? "No pude leer el total del comprobante. Probá con una foto más nítida, o escribime el gasto."
+          : "No pude sacar el monto. Probá algo como <i>“5000 super débito”</i> o <i>“cobré 30000 por transferencia”</i>.",
       );
       return OK();
     }

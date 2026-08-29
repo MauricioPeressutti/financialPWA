@@ -51,6 +51,68 @@ export function answerCallbackQuery(id: string, text?: string) {
   return call("answerCallbackQuery", { callback_query_id: id, text });
 }
 
+export function sendChatAction(
+  chatId: string | number,
+  action = "typing",
+) {
+  return call("sendChatAction", { chat_id: chatId, action });
+}
+
+const MIME_BY_EXT: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  heic: "image/heic",
+  heif: "image/heif",
+  pdf: "application/pdf",
+};
+
+/** Descarga un archivo de Telegram (foto de un comprobante, PDF…) como base64. */
+export async function getTelegramFile(
+  fileId: string,
+): Promise<{ base64: string; mimeType: string } | null> {
+  const meta = await fetch(`${API()}/getFile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: fileId }),
+  });
+  if (!meta.ok) return null;
+  const j = (await meta.json()) as {
+    ok: boolean;
+    result?: { file_path?: string; file_size?: number };
+  };
+  const path = j.result?.file_path;
+  if (!path) return null;
+  if ((j.result?.file_size ?? 0) > 15_000_000) return null;
+
+  const bin = await fetch(
+    `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${path}`,
+  );
+  if (!bin.ok) return null;
+  const buf = Buffer.from(await bin.arrayBuffer());
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const mimeType =
+    bin.headers.get("content-type")?.split(";")[0] ||
+    MIME_BY_EXT[ext] ||
+    "image/jpeg";
+  return { base64: buf.toString("base64"), mimeType };
+}
+
+type TgPhoto = {
+  file_id: string;
+  file_unique_id: string;
+  width: number;
+  height: number;
+  file_size?: number;
+};
+type TgDocument = {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+};
+
 /** Telegram update payload (solo lo que usamos). */
 export type TgUpdate = {
   message?: {
@@ -58,6 +120,9 @@ export type TgUpdate = {
     from?: { id: number; first_name?: string };
     chat: { id: number; type: string };
     text?: string;
+    caption?: string;
+    photo?: TgPhoto[];
+    document?: TgDocument;
   };
   callback_query?: {
     id: string;

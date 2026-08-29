@@ -39,17 +39,17 @@ const fmtTree = (t: CategoryTree) =>
     )
     .join("\n") || "- (ninguna)";
 
-export async function parseExpenseMessage(
-  text: string,
-  opts: {
-    expenseCategories: CategoryTree;
-    incomeCategories: CategoryTree;
-    today: string;
-  },
-): Promise<ParsedMovement | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Falta GEMINI_API_KEY");
+type ParseOpts = {
+  expenseCategories: CategoryTree;
+  incomeCategories: CategoryTree;
+  today: string;
+};
 
+type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
+function buildSystemPrompt(opts: ParseOpts, receipt: boolean): string {
   const payMethods = PAYMENT_METHODS.map(
     (m) => `${m} = ${paymentMethodMeta[m].label}`,
   ).join(", ");
@@ -96,11 +96,39 @@ export async function parseExpenseMessage(
     '- description: detalle corto y opcional (ej: "chino", "nafta", "sueldo agosto").',
     '- confidence: "alta" si monto y categoría claros; "media" si alguno es inferencia; "baja" si dudás.',
     "- note: solo si confidence no es alta, una línea con qué falta o qué asumiste.",
-  ].join("\n");
+  ];
+
+  if (receipt) {
+    system.push(
+      "",
+      "TE MANDAN LA FOTO (o PDF) DE UN COMPROBANTE: ticket, factura, resumen, captura de transferencia.",
+      "- Casi siempre es un GASTO (kind='gasto', kindClear=true). Solo es ingreso si el comprobante",
+      "  dice claramente que a vos te acreditaron/pagaron.",
+      "- amount = el TOTAL pagado (no un ítem suelto). Si hay varios totales, el mayor / el final.",
+      "- spentOn = la fecha impresa en el comprobante (YYYY-MM-DD). Si no se ve, hoy.",
+      "- description = el nombre del comercio/local.",
+      "- paymentMethod: si el comprobante muestra el medio (VISA/MASTERCARD/tarjeta, DÉBITO,",
+      "  CRÉDITO, MODO, MERCADO PAGO/MERCADOPAGO, EFECTIVO), usalo. Si no se ve, dejá \"\".",
+      "- currency: si dice USD/U$S/dólares -> USD; si no, ARS.",
+      "- Si la imagen NO es un comprobante o no podés leer el monto, amount = null.",
+      "- confidence: \"alta\" solo si el total se lee nítido.",
+    );
+  }
+
+  return system.join("\n");
+}
+
+async function callGemini(
+  system: string,
+  parts: GeminiPart[],
+  today: string,
+): Promise<ParsedMovement | null> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Falta GEMINI_API_KEY");
 
   const body = {
     systemInstruction: { parts: [{ text: system }] },
-    contents: [{ role: "user", parts: [{ text }] }],
+    contents: [{ role: "user", parts }],
     generationConfig: {
       temperature: 0.1,
       responseMimeType: "application/json",
@@ -163,11 +191,38 @@ export async function parseExpenseMessage(
       paymentMethod: p.paymentMethod ?? "",
       description: p.description ?? "",
       reimbursed: typeof p.reimbursed === "number" ? p.reimbursed : 0,
-      spentOn: p.spentOn ?? opts.today,
+      spentOn: p.spentOn ?? today,
       confidence: (p.confidence as ParsedMovement["confidence"]) ?? "baja",
       note: p.note,
     };
   } catch {
     return null;
   }
+}
+
+export function parseExpenseMessage(
+  text: string,
+  opts: ParseOpts,
+): Promise<ParsedMovement | null> {
+  return callGemini(
+    buildSystemPrompt(opts, false),
+    [{ text }],
+    opts.today,
+  );
+}
+
+/** Extrae el movimiento de la foto/PDF de un comprobante. */
+export function parseReceiptImage(
+  file: { base64: string; mimeType: string; caption?: string },
+  opts: ParseOpts,
+): Promise<ParsedMovement | null> {
+  const parts: GeminiPart[] = [
+    { inlineData: { mimeType: file.mimeType, data: file.base64 } },
+    {
+      text:
+        file.caption?.trim() ||
+        "Extraé el movimiento de este comprobante.",
+    },
+  ];
+  return callGemini(buildSystemPrompt(opts, true), parts, opts.today);
 }
