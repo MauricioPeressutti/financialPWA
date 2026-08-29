@@ -37,8 +37,8 @@ yarn-error.log*
 # vercel
 .vercel
 
-# vista local de uso (no se deploya)
-/src/app/uso/
+# vista local de uso — /api/uso, solo en next dev (no se deploya)
+/src/app/api/uso/
 
 # typescript
 *.tsbuildinfo
