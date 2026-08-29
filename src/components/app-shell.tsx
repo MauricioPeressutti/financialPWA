@@ -51,13 +51,13 @@ const BASE_NAV = [
     match: ["/movimientos", "/expenses", "/incomes"],
   },
   { href: "/analytics", label: "Análisis", icon: ChartColumn },
-  { href: "/", label: "Inicio", icon: Home },
   {
     href: "/objetivos",
     label: "Objetivos",
     icon: Target,
     goalsOnly: true,
   },
+  { href: "/", label: "Inicio", icon: Home },
   {
     href: "/esfuerzo",
     label: "Esfuerzo",
