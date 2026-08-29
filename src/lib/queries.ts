@@ -425,15 +425,20 @@ export async function getInvitationPreview(token: string) {
       teamName: teams.name,
       status: teamInvitations.status,
       expiresAt: teamInvitations.expiresAt,
+      invitedByName: users.displayName,
+      invitedByEmail: users.email,
     })
     .from(teamInvitations)
     .innerJoin(teams, eq(teams.id, teamInvitations.teamId))
+    .leftJoin(users, eq(users.id, teamInvitations.invitedByUserId))
     .where(eq(teamInvitations.token, token))
     .limit(1);
 
   if (!row) return null;
   const valid = row.status === "pending" && row.expiresAt > new Date();
-  return { teamName: row.teamName, valid };
+  const invitedBy =
+    row.invitedByName || row.invitedByEmail?.split("@")[0] || null;
+  return { teamName: row.teamName, valid, invitedBy };
 }
 
 export async function getPendingInvitations(teamId: string) {

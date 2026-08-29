@@ -23,14 +23,25 @@ export default async function JoinPage({ params }: PageProps<"/join/[token]">) {
         <CardHeader className="text-center">
           <CardTitle>Invitación</CardTitle>
           <CardDescription>
-            {preview?.valid
-              ? `Te invitaron al equipo "${preview.teamName}"`
-              : "Esta invitación no es válida o ya venció"}
+            {preview?.valid ? (
+              <>
+                {preview.invitedBy ? `${preview.invitedBy} te suma` : "Te sumaron"}{" "}
+                al equipo <b className="text-foreground">{preview.teamName}</b>
+              </>
+            ) : (
+              "Esta invitación no es válida o ya venció"
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {preview?.valid ? (
-            <JoinButton token={token} />
+            <>
+              <JoinButton token={token} />
+              <p className="text-center text-xs text-muted-foreground">
+                Vas a compartir gastos e ingresos con {preview.teamName}. Tu
+                cuenta puede estar en varios equipos.
+              </p>
+            </>
           ) : (
             <Button variant="outline" render={<Link href="/">Ir al inicio</Link>} />
           )}

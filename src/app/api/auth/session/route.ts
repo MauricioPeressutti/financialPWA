@@ -7,7 +7,7 @@ import {
   createSessionCookie,
   verifyIdToken,
 } from "@/lib/firebase/admin";
-import { ensureTeam, upsertUserFromToken } from "@/lib/users";
+import { upsertUserFromToken } from "@/lib/users";
 
 export const runtime = "nodejs";
 
@@ -25,8 +25,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Token inválido" }, { status: 401 });
   }
 
-  const user = await upsertUserFromToken(decoded);
-  await ensureTeam(user.id);
+  await upsertUserFromToken(decoded);
+  // El equipo por defecto se crea recién al entrar a la app sin equipo
+  // (ver (app)/layout.tsx). Así, quien llega por un link de invitación no
+  // arrastra un "Casa" personal que no pidió.
 
   const sessionCookie = await createSessionCookie(decoded);
   const store = await cookies();

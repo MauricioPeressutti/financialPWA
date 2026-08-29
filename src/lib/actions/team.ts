@@ -192,15 +192,15 @@ export async function acceptInvitation(token: string): Promise<ActionResult<{ te
     .values({ teamId: invite.teamId, userId: user.id, role: invite.role })
     .onConflictDoNothing();
 
-  if (invite.email) {
-    await db
-      .update(teamInvitations)
-      .set({ status: "accepted" })
-      .where(eq(teamInvitations.id, invite.id));
-  }
+  // El link queda usado (el owner genera otro si necesita sumar a alguien más).
+  await db
+    .update(teamInvitations)
+    .set({ status: "accepted" })
+    .where(eq(teamInvitations.id, invite.id));
 
   const store = await cookies();
   store.set(ACTIVE_TEAM_COOKIE, invite.teamId, { path: "/", maxAge: 60 * 60 * 24 * 365 });
+  revalidatePath("/", "layout");
   return { ok: true, teamId: invite.teamId };
 }
 
