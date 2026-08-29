@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import {
   Beer,
   Bike,
@@ -47,6 +50,9 @@ const ICONS = {
   car: Car,
   wrench: Wrench,
   bike: Bike,
+  rappi: Bike,
+  pedidosya: Bike,
+  ubereats: Bike,
   pill: Pill,
   cross: Cross,
   health: Stethoscope,
@@ -66,13 +72,23 @@ const ICONS = {
 
 type IconId = keyof typeof ICONS;
 
+// Logos de marca en /public. Si el archivo no existe, cae al icono de lucide.
+const BRAND_SRC: Partial<Record<IconId, string>> = {
+  rappi: "/rappi.png",
+  pedidosya: "/pedidosya.png",
+  ubereats: "/ubereats.png",
+};
+
 const norm = (s: string) =>
   ` ${s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "")} `;
 
 // [palabras clave, icono] — se evalúa en orden, gana la primera que matchea
-// (por eso "uber eats" va antes que "uber" = taxi).
+// (las marcas de delivery antes de "uber" = taxi).
 const RULES: [string[], IconId][] = [
-  [["rappi", "pedidosya", "pedidos ya", "uber eats", "ubereats", "delivery", "pedido"], "bike"],
+  [["rappi"], "rappi"],
+  [["pedidosya", "pedidos ya"], "pedidosya"],
+  [["uber eats", "ubereats"], "ubereats"],
+  [["delivery", "pedido"], "bike"],
   [["supermercado", "super", "almacen", "verduleria", "carniceria", "chino"], "cart"],
   [["comida", "almuerzo", "cena", "resto", "restaurant", "vianda"], "utensils"],
   [["cafe", "starbucks", "havanna"], "coffee"],
@@ -121,8 +137,28 @@ export function CategoryIcon({
   name: string;
   className?: string;
 }) {
+  const [brandFailed, setBrandFailed] = useState(false);
   const id = categoryIconId(name);
   if (!id) return null;
+
+  const src = BRAND_SRC[id];
+  if (src && !brandFailed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        onError={() => setBrandFailed(true)}
+        className={cn(
+          "size-4 shrink-0 rounded-[3px] object-contain",
+          className,
+        )}
+      />
+    );
+  }
+
   const Icon = ICONS[id];
   return (
     <Icon className={cn("size-4 shrink-0 text-muted-foreground", className)} />
