@@ -14,12 +14,17 @@ import {
 } from "@/components/ui/card";
 import {
   completeGoogleRedirect,
+  currentFirebaseUser,
+  onFirebaseUser,
   shouldUseRedirect,
   signInWithGooglePopup,
   signInWithGoogleRedirect,
 } from "@/lib/firebase/client";
 
 const NEXT_KEY = "postLoginNext";
+// El canje del token corre una sola vez aunque el efecto se re-monte (StrictMode)
+// o el listener de auth dispare más de una vez.
+let exchangeStarted = false;
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -65,29 +70,44 @@ export function SignInForm() {
     router.refresh();
   }
 
-  // Al volver del redirect de Google
+  async function runExchange(getToken: () => Promise<string>) {
+    if (exchangeStarted) return;
+    exchangeStarted = true;
+    setLoading(true);
+    try {
+      await exchangeAndGo(await getToken());
+    } catch (err) {
+      console.error("exchange:", err);
+      toast.error("No se pudo completar el ingreso");
+      exchangeStarted = false;
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const idToken = await completeGoogleRedirect();
-        if (!idToken || cancelled) return;
-        setLoading(true);
-        await exchangeAndGo(idToken);
-      } catch (err) {
-        console.error(err);
-        toast.error("No se pudo completar el ingreso");
-        setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    // Si volvés de un redirect de Google, esto procesa el resultado y dispara
+    // el listener de abajo.
+    completeGoogleRedirect().catch((e) => console.error("redirect:", e));
+
+    // Cubre los 3 casos: Firebase ya firmado (cookie de app vencida), vuelta de
+    // redirect, y popup. En todos hay un User -> canjeamos su token.
+    const unsub = onFirebaseUser((user) => {
+      if (user) void runExchange(() => user.getIdToken());
+    });
+    return () => unsub();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSignIn() {
     setLoading(true);
+
+    // Firebase ya te tiene firmado: no hace falta ir a Google, solo la sesión.
+    const existing = currentFirebaseUser();
+    if (existing) {
+      await runExchange(() => existing.getIdToken());
+      return;
+    }
+
     try {
       if (shouldUseRedirect()) {
         try {
@@ -97,12 +117,14 @@ export function SignInForm() {
         return;
       }
       const idToken = await signInWithGooglePopup();
-      await exchangeAndGo(idToken);
+      await runExchange(() => Promise.resolve(idToken));
     } catch (err) {
       const code = (err as { code?: string })?.code;
       console.error("sign-in error:", code, err);
-      if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request") {
-        // fallback a redirect si el popup fue bloqueado
+      if (
+        code === "auth/popup-blocked" ||
+        code === "auth/cancelled-popup-request"
+      ) {
         try {
           sessionStorage.setItem(NEXT_KEY, params.get("next") || "/");
           await signInWithGoogleRedirect();
@@ -110,7 +132,9 @@ export function SignInForm() {
         } catch {}
       }
       toast.error(
-        code ? `No se pudo iniciar sesión (${code})` : "No se pudo iniciar sesión con Google",
+        code
+          ? `No se pudo iniciar sesión (${code})`
+          : "No se pudo iniciar sesión con Google",
       );
       setLoading(false);
     }
