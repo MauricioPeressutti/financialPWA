@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/firebase/admin";
 import { FX_REFERENCES, isCurrency } from "@/lib/currencies";
+import { ensureTeam } from "@/lib/users";
 
 type ActionResult<T = unknown> =
   | ({ ok: true } & T)
@@ -70,6 +71,35 @@ export async function leaveTeam(): Promise<ActionResult> {
   store.delete(ACTIVE_TEAM_COOKIE);
   revalidatePath("/", "layout");
   return { ok: true };
+}
+
+/** Onboarding: crea el primer equipo del usuario (pantalla /bienvenida). */
+export async function createFirstTeam(
+  name: string,
+): Promise<ActionResult<{ teamId: string }>> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "No autenticado" };
+
+  const mine = await getUserTeams(user.id);
+  if (mine.length > 0) return { ok: true, teamId: mine[0].id };
+
+  const teamId = await ensureTeam(user.id, name);
+
+  const store = await cookies();
+  store.set(ACTIVE_TEAM_COOKIE, teamId, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+  revalidatePath("/", "layout");
+  return { ok: true, teamId };
+}
+
+/** Onboarding: unirse a un equipo desde /bienvenida (link o solo el token). */
+export async function joinFromInput(input: string): Promise<ActionResult> {
+  const m = input.match(/\/join\/([^/?#\s]+)/);
+  const token = (m ? m[1] : input).trim();
+  if (!token) return { ok: false, error: "Pegá el enlace o el código" };
+  return acceptInvitation(token);
 }
 
 /** Elimina el equipo entero (cascade: gastos, ingresos, categorías, objetivos…). Solo owner. */

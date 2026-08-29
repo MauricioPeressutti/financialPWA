@@ -48,7 +48,7 @@ export async function upsertUserFromToken(token: FirebaseToken) {
 }
 
 /** Si el usuario no tiene equipo, le crea uno con categorías por defecto. */
-export async function ensureTeam(userId: string) {
+export async function ensureTeam(userId: string, name = "Casa") {
   const existing = await db
     .select({ teamId: teamMembers.teamId })
     .from(teamMembers)
@@ -59,7 +59,7 @@ export async function ensureTeam(userId: string) {
 
   const [team] = await db
     .insert(teams)
-    .values({ name: "Casa", ownerUserId: userId })
+    .values({ name: name.trim().slice(0, 40) || "Casa", ownerUserId: userId })
     .returning();
 
   await db.insert(teamMembers).values({ teamId: team.id, userId, role: "owner" });
