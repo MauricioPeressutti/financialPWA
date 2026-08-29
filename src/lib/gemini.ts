@@ -105,6 +105,8 @@ function buildSystemPrompt(opts: ParseOpts, receipt: boolean): string {
       "- Casi siempre es un GASTO (kind='gasto', kindClear=true). Solo es ingreso si el comprobante",
       "  dice claramente que a vos te acreditaron/pagaron.",
       "- amount = el TOTAL pagado (no un ítem suelto). Si hay varios totales, el mayor / el final.",
+      "  Formato argentino: punto = miles, coma = decimales ('$ 12.500,00' = 12500).",
+      "  Si el total está algo borroso pero se intuye, dá tu mejor lectura con confidence='baja'.",
       "- spentOn = la fecha impresa en el comprobante (YYYY-MM-DD). Si no se ve, hoy.",
       "- description = el nombre del comercio/local.",
       "- paymentMethod: si el comprobante muestra el medio (VISA/MASTERCARD/tarjeta, DÉBITO,",
@@ -173,13 +175,26 @@ async function callGemini(
   }
 
   const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: {
+      content?: { parts?: { text?: string }[] };
+      finishReason?: string;
+    }[];
+    promptFeedback?: { blockReason?: string };
   };
   const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!jsonText) return null;
+  if (!jsonText) {
+    console.error("gemini: sin texto", {
+      finishReason: data.candidates?.[0]?.finishReason,
+      blockReason: data.promptFeedback?.blockReason,
+    });
+    return null;
+  }
 
   try {
     const p = JSON.parse(jsonText) as Partial<ParsedMovement>;
+    if (typeof p.amount !== "number") {
+      console.error("gemini: amount null", jsonText.slice(0, 300));
+    }
     return {
       kind: p.kind === "ingreso" ? "ingreso" : "gasto",
       kindClear: p.kindClear !== false,

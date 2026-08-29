@@ -91,10 +91,15 @@ export async function getTelegramFile(
   );
   if (!bin.ok) return null;
   const buf = Buffer.from(await bin.arrayBuffer());
+
+  // La extensión del file_path de Telegram es confiable; el content-type del
+  // file server suele venir "application/octet-stream", y con eso Gemini
+  // ignora la imagen.
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  const header = bin.headers.get("content-type")?.split(";")[0]?.trim();
   const mimeType =
-    bin.headers.get("content-type")?.split(";")[0] ||
     MIME_BY_EXT[ext] ||
+    (header && /^(image\/[\w.+-]+|application\/pdf)$/.test(header) ? header : "") ||
     "image/jpeg";
   return { base64: buf.toString("base64"), mimeType };
 }
