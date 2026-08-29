@@ -19,6 +19,7 @@ import { MonthPicker } from "@/components/month-picker";
 import { CurrencyTabs } from "@/components/currency-tabs";
 import { getTeamBalance } from "@/lib/balance";
 import { getTopGoal } from "@/lib/goals";
+import { CategoryIcon } from "@/lib/category-icons";
 
 export default async function DashboardPage({
   searchParams,
@@ -204,7 +205,10 @@ export default async function DashboardPage({
                 key={c.categoryId}
                 className="flex justify-between border-b py-1.5 text-sm"
               >
-                <span>{c.categoryName}</span>
+                <span className="flex items-center gap-1.5">
+                  <CategoryIcon name={c.categoryName} />
+                  {c.categoryName}
+                </span>
                 <span className="font-medium">{fm(c.totalCents)}</span>
               </div>
             ))}
@@ -223,7 +227,10 @@ export default async function DashboardPage({
                 key={c.categoryId}
                 className="flex justify-between border-b py-1.5 text-sm"
               >
-                <span>{c.categoryName}</span>
+                <span className="flex items-center gap-1.5">
+                  <CategoryIcon name={c.categoryName} />
+                  {c.categoryName}
+                </span>
                 <span className="font-medium text-emerald-600">
                   {fm(c.totalCents)}
                 </span>

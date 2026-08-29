@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CategoryIcon } from "@/lib/category-icons";
 import {
   createCategory,
   createSubcategory,
@@ -73,7 +74,10 @@ export function CategoryManager({
             className={cat.archived ? "opacity-50" : undefined}
           >
             <div className="flex items-center justify-between border-b pb-1">
-              <span className="font-medium">{cat.name}</span>
+              <span className="flex items-center gap-2 font-medium">
+                <CategoryIcon name={cat.name} className="text-foreground/70" />
+                {cat.name}
+              </span>
               {canEdit && (
                 <Button
                   variant="ghost"
@@ -94,7 +98,10 @@ export function CategoryManager({
                   key={sub.id}
                   className={`flex items-center justify-between ${sub.archived ? "opacity-50" : ""}`}
                 >
-                  <span>{sub.name}</span>
+                  <span className="flex items-center gap-1.5">
+                    <CategoryIcon name={sub.name} className="size-3.5" />
+                    {sub.name}
+                  </span>
                   {canEdit && (
                     <Button
                       variant="ghost"
