@@ -6,9 +6,14 @@ export async function extractPdfText(data: Uint8Array): Promise<string> {
     const { extractText, getDocumentProxy } = await import("unpdf");
     const pdf = await getDocumentProxy(data);
     const { text } = await extractText(pdf, { mergePages: true });
-    return (Array.isArray(text) ? text.join("\n") : text).trim();
+    const out = (Array.isArray(text) ? text.join("\n") : text).trim();
+    console.log("[pdf] ok:", out.length, "chars");
+    return out;
   } catch (err) {
-    console.error("pdf extract:", err);
+    console.error(
+      "[pdf] extract FAILED:",
+      err instanceof Error ? `${err.name}: ${err.message}` : err,
+    );
     return "";
   }
 }

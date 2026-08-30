@@ -430,10 +430,19 @@ export async function POST(req: Request) {
         );
         return OK();
       }
-      const isPdf = file.mimeType === "application/pdf";
+      const isPdf =
+        file.mimeType === "application/pdf" ||
+        doc?.mime_type === "application/pdf" ||
+        /\.pdf$/i.test(doc?.file_name ?? "");
       const pdfText = isPdf
         ? await extractPdfText(Buffer.from(file.base64, "base64"))
         : "";
+      console.log("[tg] file", {
+        docMime: doc?.mime_type,
+        fileMime: file.mimeType,
+        isPdf,
+        pdfChars: pdfText.length,
+      });
       if (pdfText.length > 15) {
         parsed = await parseReceiptText(pdfText, { ...parseOpts, caption });
       } else {
