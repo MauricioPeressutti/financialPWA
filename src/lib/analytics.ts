@@ -433,6 +433,43 @@ export async function getAnalytics(
 export type Analytics = Awaited<ReturnType<typeof getAnalytics>>;
 
 // ─────────────────────────────────────────────────────────
+/** Gasto bruto por día de los últimos `days` días — para el mapa de calor,
+ *  que siempre muestra una ventana fija (independiente del filtro de tiempo). */
+export async function getDailySpend(
+  teamId: string,
+  days: number,
+  currency = "ARS",
+  memberId?: string,
+) {
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  const mE = memberId ? [eq(expenses.createdByUserId, memberId)] : [];
+
+  const rows = await db
+    .select({
+      d: expenses.spentOn,
+      gross: sql<number>`sum(${expenses.amountCents})`,
+      count: sql<number>`count(*)`,
+    })
+    .from(expenses)
+    .where(
+      and(
+        eq(expenses.teamId, teamId),
+        eq(expenses.currency, currency),
+        gte(expenses.spentOn, iso(start)),
+        ...mE,
+      ),
+    )
+    .groupBy(expenses.spentOn);
+
+  return rows
+    .map((r) => ({ date: String(r.d), cents: n(r.gross), count: n(r.count) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export type DailySpend = Awaited<ReturnType<typeof getDailySpend>>;
+
+// ─────────────────────────────────────────────────────────
 export async function getMonthlyTrend(
   teamId: string,
   months = 12,

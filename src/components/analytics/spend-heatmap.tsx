@@ -8,16 +8,17 @@ type Day = { date: string; cents: number; count: number };
 
 const HEAT = ["--heat-0", "--heat-1", "--heat-2", "--heat-3", "--heat-4"];
 const MON = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const MAX_WEEKS = 26;
 
 export function SpendHeatmap({
   days,
   to,
   currency = "ARS",
+  weeks: maxWeeks = 26,
 }: {
   days: Day[];
   to: string;
   currency?: string;
+  weeks?: number;
 }) {
   const formatCents = (c: number) => formatMoney(c, currency);
   const [tip, setTip] = useState<{ x: number; y: number; t: string; r: string } | null>(null);
@@ -29,7 +30,7 @@ export function SpendHeatmap({
     const last = end > today ? today : end;
     // arranca un lunes
     const start = new Date(last);
-    start.setDate(start.getDate() - (MAX_WEEKS * 7 - 1));
+    start.setDate(start.getDate() - (maxWeeks * 7 - 1));
     while (start.getDay() !== 1) start.setDate(start.getDate() - 1);
 
     const wk = Math.ceil((last.getTime() - start.getTime()) / 86400000 / 7) + 1;
@@ -51,7 +52,7 @@ export function SpendHeatmap({
     vals.sort((a, b) => a - b);
     const q = (p: number) => (vals.length ? vals[Math.floor(p * (vals.length - 1))] : 0);
     return { cells: cs, weeks: wk, levels: [q(0.25), q(0.5), q(0.8)] };
-  }, [days, to]);
+  }, [days, to, maxWeeks]);
 
   const lvl = (c: number) =>
     c <= 0 ? 0 : c <= levels[0] ? 1 : c <= levels[1] ? 2 : c <= levels[2] ? 3 : 4;

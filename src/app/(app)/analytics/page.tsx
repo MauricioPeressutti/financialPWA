@@ -13,6 +13,7 @@ import { requireTeam } from "@/lib/auth";
 import {
   buildCategoryColors,
   getAnalytics,
+  getDailySpend,
   getMonthlyTrend,
   getSpendPace,
   resolveRange,
@@ -28,8 +29,12 @@ import {
   getTeamMembers,
 } from "@/lib/queries";
 
-const RANGES: Range[] = ["1m", "3m", "6m", "1y", "all"];
+const RANGES: Range[] = ["1w", "1m", "3m", "6m"];
 const GREEN = "#10b981";
+// El mapa de calor siempre muestra una ventana fija de ~3 meses,
+// sin importar el filtro de tiempo elegido.
+const HEATMAP_DAYS = 100;
+const HEATMAP_WEEKS = 14;
 
 function Kpi({
   label,
@@ -101,12 +106,14 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
       ? sp.member
       : undefined;
 
-  const [a, trend, pace, expenseCats] = await Promise.all([
+  const [a, trend, pace, expenseCats, heatDays] = await Promise.all([
     getAnalytics(team.id, from, to, cur, memberId),
     getMonthlyTrend(team.id, 12, cur, memberId),
     getSpendPace(team.id, cur, memberId),
     getActiveCategories(team.id, "expense"),
+    getDailySpend(team.id, HEATMAP_DAYS, cur, memberId),
   ]);
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   const colors = buildCategoryColors(expenseCats.map((c) => c.name));
   const insights = buildInsights(a, pace, cur);
@@ -214,11 +221,16 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
             </Section>
           )}
 
-          {a.days.length > 0 && (
-            <Section title="Mapa de gasto diario">
+          {heatDays.length > 0 && (
+            <Section title="Mapa de gasto diario" hint="últimos 3 meses">
               <Card>
                 <CardContent className="pt-4">
-                  <SpendHeatmap days={a.days} to={to} currency={cur} />
+                  <SpendHeatmap
+                    days={heatDays}
+                    to={todayIso}
+                    currency={cur}
+                    weeks={HEATMAP_WEEKS}
+                  />
                 </CardContent>
               </Card>
             </Section>
