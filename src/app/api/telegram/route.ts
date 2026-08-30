@@ -18,8 +18,10 @@ import { fxForMovement } from "@/lib/fx";
 import {
   parseExpenseMessage,
   parseReceiptImage,
+  parseReceiptText,
   type ParsedMovement,
 } from "@/lib/gemini";
+import { extractPdfText } from "@/lib/pdf";
 import { formatCents, formatMoney } from "@/lib/money";
 import {
   PAYMENT_METHODS,
@@ -416,6 +418,7 @@ export async function POST(req: Request) {
       today: today(),
     };
 
+    const caption = msg.caption?.trim();
     let parsed: ParsedMovement | null;
     if (fileId) {
       await sendChatAction(chatId, "typing");
@@ -423,14 +426,19 @@ export async function POST(req: Request) {
       if (!file) {
         await sendMessage(
           chatId,
-          "No pude bajar la imagen (¿muy pesada?). Sacá una foto más liviana o cargalo por texto.",
+          "No pude bajar el archivo (¿muy pesado?). Sacá una foto más liviana o cargalo por texto.",
         );
         return OK();
       }
-      parsed = await parseReceiptImage(
-        { ...file, caption: msg.caption?.trim() },
-        parseOpts,
-      );
+      const isPdf = file.mimeType === "application/pdf";
+      const pdfText = isPdf
+        ? await extractPdfText(Buffer.from(file.base64, "base64"))
+        : "";
+      if (pdfText.length > 15) {
+        parsed = await parseReceiptText(pdfText, { ...parseOpts, caption });
+      } else {
+        parsed = await parseReceiptImage({ ...file, caption }, parseOpts);
+      }
     } else {
       parsed = await parseExpenseMessage(text, parseOpts);
     }

@@ -4,6 +4,9 @@ import type { NextConfig } from "next";
 const FIREBASE_AUTH_HOST = "financial-app-a7ce1.firebaseapp.com";
 
 const nextConfig: NextConfig = {
+  // unpdf trae un build serverless de pdf.js; que Next no lo bundlee.
+  serverExternalPackages: ["unpdf"],
+
   async headers() {
     return [
       {
