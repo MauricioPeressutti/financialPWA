@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   date,
   doublePrecision,
@@ -119,7 +120,8 @@ export const goals = pgTable("goals", {
     .references(() => teams.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   emoji: text("emoji").notNull().default("🎯"),
-  targetCents: integer("target_cents").notNull(),
+  // bigint: en ARS un objetivo puede superar los ~$21M que aguanta un int4.
+  targetCents: bigint("target_cents", { mode: "number" }).notNull(),
   currency: text("currency").notNull().default("ARS"),
   scope: goalScope("scope").notNull().default("shared"),
   ownerUserId: uuid("owner_user_id").references(() => users.id, {
@@ -143,7 +145,7 @@ export const goalContributions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    amountCents: integer("amount_cents").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
     note: text("note"),
     contributedOn: date("contributed_on").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

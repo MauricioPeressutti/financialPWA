@@ -78,6 +78,13 @@
       "when": 1787927710216,
       "tag": "0010_objetivos",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788223176196,
+      "tag": "0011_equal_zarek",
+      "breakpoints": true
     }
   ]
 }
