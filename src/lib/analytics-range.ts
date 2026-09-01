@@ -11,6 +11,20 @@ export const RANGE_LABELS: Record<AnalyticsRange, string> = {
   "6m": "6 meses",
 };
 
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Lee ?from&?to de los searchParams. Devuelve el rango custom si ambos son
+ *  fechas válidas (ordenadas si vienen al revés), o null. */
+export function parseCustomRange(sp: {
+  from?: string | string[];
+  to?: string | string[];
+}): { from: string; to: string } | null {
+  const f = typeof sp.from === "string" && YMD.test(sp.from) ? sp.from : null;
+  const t = typeof sp.to === "string" && YMD.test(sp.to) ? sp.to : null;
+  if (!f || !t) return null;
+  return f <= t ? { from: f, to: t } : { from: t, to: f };
+}
+
 export function resolveRange(range: AnalyticsRange): { from: string; to: string } {
   const to = new Date();
   const from = new Date(to);
