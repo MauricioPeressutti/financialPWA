@@ -15,6 +15,7 @@ export type NewIncome = {
   method: IncomeMethod;
   description?: string | null;
   receivedOn: string; // YYYY-MM-DD
+  source?: string; // "web" (default) | "telegram"
 };
 
 /**
@@ -53,6 +54,7 @@ export async function insertIncome(
       method: e.method,
       description: e.description || null,
       receivedOn: e.receivedOn,
+      source: e.source === "telegram" ? "telegram" : "web",
     })
     .returning({ id: incomes.id });
 

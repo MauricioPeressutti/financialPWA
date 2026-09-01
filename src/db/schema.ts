@@ -259,6 +259,8 @@ export const expenses = pgTable(
     paymentMethod: paymentMethod("payment_method").notNull(),
     description: text("description"),
     spentOn: date("spent_on").notNull(),
+    // Cómo se cargó: "web" (formulario) | "telegram" (bot)
+    source: text("source").notNull().default("web"),
     // Calculadora de esfuerzo
     splitMode: splitMode("split_mode").notNull().default("none"),
     paidByUserId: uuid("paid_by_user_id").references(() => users.id),
@@ -331,6 +333,8 @@ export const incomes = pgTable(
     method: incomeMethod("method").notNull().default("transferencia"),
     description: text("description"),
     receivedOn: date("received_on").notNull(),
+    // Cómo se cargó: "web" (formulario) | "telegram" (bot)
+    source: text("source").notNull().default("web"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

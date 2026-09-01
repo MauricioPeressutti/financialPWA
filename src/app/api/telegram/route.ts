@@ -233,6 +233,7 @@ async function commitMovement(
       method,
       description: p.description || null,
       receivedOn: on,
+      source: "telegram",
     });
     rev();
     return renderMovement({
@@ -273,6 +274,7 @@ async function commitMovement(
     description: p.description || null,
     spentOn: on,
     reimbursedCents,
+    source: "telegram",
   });
   rev();
   return renderMovement({

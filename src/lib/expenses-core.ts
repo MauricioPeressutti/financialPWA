@@ -23,6 +23,7 @@ export type NewExpense = {
   description?: string | null;
   spentOn: string; // YYYY-MM-DD
   reimbursedCents?: number | null; // en la misma moneda que el gasto
+  source?: string; // "web" (default) | "telegram"
   // Calculadora de esfuerzo
   splitMode?: SplitMode | "none";
   paidByUserId?: string | null;
@@ -68,6 +69,7 @@ export async function insertExpense(
       paymentMethod: e.paymentMethod,
       description: e.description || null,
       spentOn: e.spentOn,
+      source: e.source === "telegram" ? "telegram" : "web",
       splitMode,
       paidByUserId: splitMode !== "none" ? e.paidByUserId || null : null,
     })
