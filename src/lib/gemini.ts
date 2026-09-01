@@ -122,11 +122,17 @@ function buildSystemPrompt(opts: ParseOpts, receipt: boolean): string {
   return system.join("\n");
 }
 
-async function callGemini(
+/**
+ * Llama a Gemini pidiéndole JSON con un `responseSchema` y devuelve el objeto
+ * parseado (o null si no vino texto / no parsea). Reutilizable para cualquier
+ * extractor (movimientos, resúmenes de tarjeta, etc.).
+ */
+export async function geminiJson<T>(
   system: string,
   parts: GeminiPart[],
-  today: string,
-): Promise<ParsedMovement | null> {
+  responseSchema: Record<string, unknown>,
+  { temperature = 0.1, tag = "gemini" }: { temperature?: number; tag?: string } = {},
+): Promise<T | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("Falta GEMINI_API_KEY");
 
@@ -134,34 +140,9 @@ async function callGemini(
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: "user", parts }],
     generationConfig: {
-      temperature: 0.1,
+      temperature,
       responseMimeType: "application/json",
-      responseSchema: {
-        type: "object",
-        properties: {
-          kind: { type: "string", enum: ["gasto", "ingreso"] },
-          kindClear: { type: "boolean" },
-          amount: { type: "number", nullable: true },
-          currency: { type: "string", enum: ["ARS", "USD", "EUR"] },
-          category: { type: "string" },
-          subcategory: { type: "string" },
-          paymentMethod: { type: "string" },
-          description: { type: "string" },
-          reimbursed: { type: "number" },
-          spentOn: { type: "string" },
-          confidence: { type: "string", enum: ["alta", "media", "baja"] },
-          note: { type: "string" },
-        },
-        required: [
-          "kind",
-          "kindClear",
-          "amount",
-          "currency",
-          "category",
-          "paymentMethod",
-          "confidence",
-        ],
-      },
+      responseSchema,
     },
   };
 
@@ -185,7 +166,7 @@ async function callGemini(
   };
   const jsonText = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!jsonText) {
-    console.error("gemini: sin texto", {
+    console.error(`${tag}: sin texto`, {
       finishReason: data.candidates?.[0]?.finishReason,
       blockReason: data.promptFeedback?.blockReason,
     });
@@ -193,28 +174,69 @@ async function callGemini(
   }
 
   try {
-    const p = JSON.parse(jsonText) as Partial<ParsedMovement>;
-    if (typeof p.amount !== "number") {
-      console.error("gemini: amount null", jsonText.slice(0, 300));
-    }
-    return {
-      kind: p.kind === "ingreso" ? "ingreso" : "gasto",
-      kindClear: p.kindClear !== false,
-      amount: typeof p.amount === "number" ? p.amount : null,
-      currency:
-        p.currency === "USD" || p.currency === "EUR" ? p.currency : "ARS",
-      category: p.category ?? "",
-      subcategory: p.subcategory ?? "",
-      paymentMethod: p.paymentMethod ?? "",
-      description: p.description ?? "",
-      reimbursed: typeof p.reimbursed === "number" ? p.reimbursed : 0,
-      spentOn: p.spentOn ?? today,
-      confidence: (p.confidence as ParsedMovement["confidence"]) ?? "baja",
-      note: p.note,
-    };
+    return JSON.parse(jsonText) as T;
   } catch {
+    console.error(`${tag}: JSON inválido`, jsonText.slice(0, 300));
     return null;
   }
+}
+
+const MOVEMENT_SCHEMA = {
+  type: "object",
+  properties: {
+    kind: { type: "string", enum: ["gasto", "ingreso"] },
+    kindClear: { type: "boolean" },
+    amount: { type: "number", nullable: true },
+    currency: { type: "string", enum: ["ARS", "USD", "EUR"] },
+    category: { type: "string" },
+    subcategory: { type: "string" },
+    paymentMethod: { type: "string" },
+    description: { type: "string" },
+    reimbursed: { type: "number" },
+    spentOn: { type: "string" },
+    confidence: { type: "string", enum: ["alta", "media", "baja"] },
+    note: { type: "string" },
+  },
+  required: [
+    "kind",
+    "kindClear",
+    "amount",
+    "currency",
+    "category",
+    "paymentMethod",
+    "confidence",
+  ],
+};
+
+async function callGemini(
+  system: string,
+  parts: GeminiPart[],
+  today: string,
+): Promise<ParsedMovement | null> {
+  const p = await geminiJson<Partial<ParsedMovement>>(
+    system,
+    parts,
+    MOVEMENT_SCHEMA,
+  );
+  if (!p) return null;
+
+  if (typeof p.amount !== "number") {
+    console.error("gemini: amount null", JSON.stringify(p).slice(0, 300));
+  }
+  return {
+    kind: p.kind === "ingreso" ? "ingreso" : "gasto",
+    kindClear: p.kindClear !== false,
+    amount: typeof p.amount === "number" ? p.amount : null,
+    currency: p.currency === "USD" || p.currency === "EUR" ? p.currency : "ARS",
+    category: p.category ?? "",
+    subcategory: p.subcategory ?? "",
+    paymentMethod: p.paymentMethod ?? "",
+    description: p.description ?? "",
+    reimbursed: typeof p.reimbursed === "number" ? p.reimbursed : 0,
+    spentOn: p.spentOn ?? today,
+    confidence: (p.confidence as ParsedMovement["confidence"]) ?? "baja",
+    note: p.note,
+  };
 }
 
 export function parseExpenseMessage(

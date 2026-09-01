@@ -3,7 +3,9 @@ import "server-only";
 const API = () =>
   `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
 
-type InlineButton = { text: string; callback_data: string };
+type InlineButton =
+  | { text: string; callback_data: string }
+  | { text: string; url: string };
 
 async function call(method: string, payload: Record<string, unknown>) {
   const res = await fetch(`${API()}/${method}`, {

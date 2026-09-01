@@ -49,6 +49,14 @@ export const goalStatus = pgEnum("goal_status", [
   "archived",
 ]);
 
+export const cardStatementStatus = pgEnum("card_statement_status", [
+  "pending", // recién parseado, sin decidir qué hacer
+  "reminder_only", // solo se usa para el aviso de vencimiento
+  "imported", // se cargaron los consumos
+  "paid", // marcado como pagado
+  "dismissed", // descartado
+]);
+
 export const memberRole = pgEnum("member_role", ["owner", "member"]);
 
 export const invitationStatus = pgEnum("invitation_status", [
@@ -151,6 +159,44 @@ export const goalContributions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [index("goal_contributions_goal_idx").on(t.goalId)],
+);
+
+// ─── Resúmenes de tarjeta de crédito ───────────────────
+export const cardStatements = pgTable(
+  "card_statements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    createdByUserId: uuid("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    bank: text("bank"),
+    brand: text("brand"), // visa / mastercard / amex / ...
+    last4: text("last4"),
+    label: text("label").notNull(), // "Visa · Galicia · ••1234"
+    closingDate: date("closing_date"),
+    dueDate: date("due_date").notNull(),
+    totalArsCents: bigint("total_ars_cents", { mode: "number" }).notNull().default(0),
+    totalUsdCents: bigint("total_usd_cents", { mode: "number" }).notNull().default(0),
+    minPaymentArsCents: bigint("min_payment_ars_cents", { mode: "number" }),
+    status: cardStatementStatus("status").notNull().default("pending"),
+    raw: jsonb("raw"), // ParsedStatement completo (para la pantalla de revisión)
+    // { created: string[], linked: { id, prevAmountCents }[] } — para deshacer la importación
+    importLog: jsonb("import_log"),
+    remindedOn: date("reminded_on"), // último día que se avisó, para no repetir
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("card_statements_team_due_idx").on(t.teamId, t.dueDate),
+    uniqueIndex("card_statements_dedupe_idx").on(
+      t.teamId,
+      t.bank,
+      t.last4,
+      t.closingDate,
+    ),
+  ],
 );
 
 // ─── Cotizaciones (cache diario) ───────────────────────
@@ -262,12 +308,17 @@ export const expenses = pgTable(
     // Calculadora de esfuerzo
     splitMode: splitMode("split_mode").notNull().default("none"),
     paidByUserId: uuid("paid_by_user_id").references(() => users.id),
+    // Importado desde un resumen de tarjeta (para poder deshacer la importación)
+    statementId: uuid("statement_id").references(() => cardStatements.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index("expenses_team_spent_idx").on(t.teamId, t.spentOn),
     index("expenses_team_category_idx").on(t.teamId, t.categoryId),
+    index("expenses_statement_idx").on(t.statementId),
   ],
 );
 
@@ -376,6 +427,8 @@ export type Settlement = typeof settlements.$inferSelect;
 export type SplitMode = (typeof splitMode.enumValues)[number];
 export type Goal = typeof goals.$inferSelect;
 export type GoalContribution = typeof goalContributions.$inferSelect;
+export type CardStatement = typeof cardStatements.$inferSelect;
+export type CardStatementStatus = (typeof cardStatementStatus.enumValues)[number];
 export type PaymentMethod = (typeof paymentMethod.enumValues)[number];
 export type IncomeMethod = (typeof incomeMethod.enumValues)[number];
 export type CategoryKind = (typeof categoryKind.enumValues)[number];

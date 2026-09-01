@@ -34,6 +34,9 @@ import {
   type IncomeMethod,
 } from "@/lib/income-methods";
 import { getActiveCategories, getExpense, getIncome } from "@/lib/queries";
+import { normCat as norm, resolveCategory } from "@/lib/categories-resolve";
+import { looksLikeStatement } from "@/lib/card-statement";
+import { handleStatementPdf, markStatementPaidById } from "@/lib/card-statement-bot";
 import {
   answerCallbackQuery,
   editMessageText,
@@ -68,6 +71,10 @@ const HELP = [
   "Mandame la foto del ticket, la factura o la captura de la transferencia y lo cargo solo.",
   "Podés agregarle un texto de aclaración a la foto (ej: <i>“fue con la de crédito”</i>).",
   "",
+  "<b>💳 Resumen de tarjeta de crédito</b>",
+  "Mandame el PDF del resumen (de cualquier banco) y te aviso cuándo vence y cuánto,",
+  "y te dejo un link para cargar los consumos sin duplicar los que ya tenías.",
+  "",
   "Yo saco solo el monto, la categoría, la forma de pago y la fecha. Si algo no me queda claro te aviso.",
   "Después de cada carga te dejo un botón <b>🗑️ Borrar</b> por si me equivoqué.",
 ].join("\n");
@@ -82,27 +89,7 @@ function today(): string {
     .slice(0, 10);
 }
 
-const norm = (s: string) =>
-  (s ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .split("")
-    .filter((c) => {
-      const code = c.charCodeAt(0);
-      return code < 0x300 || code > 0x36f;
-    })
-    .join("")
-    .trim();
-
 type Cat = Awaited<ReturnType<typeof getActiveCategories>>[number];
-
-function resolveCategory(cats: Cat[], name: string) {
-  let cat = cats.find((c) => norm(c.name) === norm(name));
-  if (!cat && name)
-    cat = cats.find((c) => norm(c.name).includes(norm(name)));
-  if (!cat) cat = cats.find((c) => norm(c.name) === "otros") ?? cats[0];
-  return cat ?? null;
-}
 
 type Btn = { text: string; callback_data: string };
 
@@ -443,6 +430,20 @@ export async function POST(req: Request) {
         isPdf,
         pdfChars: pdfText.length,
       });
+
+      // ¿Es un resumen de tarjeta y no un comprobante suelto?
+      if (pdfText.length > 400 && looksLikeStatement(pdfText)) {
+        await handleStatementPdf({
+          chatId,
+          teamId,
+          userId: link.userId,
+          pdfText,
+          expenseCategories: parseOpts.expenseCategories,
+          today: parseOpts.today,
+        });
+        return OK();
+      }
+
       if (pdfText.length > 15) {
         parsed = await parseReceiptText(pdfText, { ...parseOpts, caption });
       } else {
@@ -538,6 +539,19 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
     return;
   }
   const teamId = (await teamOf(link.userId)) ?? "";
+
+  // ── resumen de tarjeta: "ya la pagué" / "solo recordar" / "descartar" ──
+  if (
+    data.startsWith("cardpaid:") ||
+    data.startsWith("cardremind:") ||
+    data.startsWith("carddismiss:")
+  ) {
+    const [action, id] = data.split(":");
+    const msg = await markStatementPaidById(teamId, id, action);
+    await editMessageText(chatId, messageId, msg);
+    await answerCallbackQuery(cq.id, "Listo");
+    return;
+  }
 
   // ── responder "¿gasto o ingreso?" ──
   if (data.startsWith("pk:")) {

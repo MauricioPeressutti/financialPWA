@@ -7,6 +7,7 @@ import {
   Home,
   ArrowLeftRight,
   ChartColumn,
+  CreditCard,
   Tags,
   Users,
   LogOut,
@@ -51,6 +52,11 @@ const BASE_NAV = [
     match: ["/movimientos", "/expenses", "/incomes"],
   },
   { href: "/analytics", label: "Análisis", icon: ChartColumn },
+  {
+    href: "/tarjetas",
+    label: "Tarjetas",
+    icon: CreditCard,
+  },
   {
     href: "/objetivos",
     label: "Objetivos",

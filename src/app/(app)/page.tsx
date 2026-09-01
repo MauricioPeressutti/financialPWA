@@ -19,6 +19,7 @@ import { MonthPicker } from "@/components/month-picker";
 import { CurrencyTabs } from "@/components/currency-tabs";
 import { getTeamBalance } from "@/lib/balance";
 import { getTopGoal } from "@/lib/goals";
+import { getUpcomingStatement } from "@/lib/card-statements";
 import { CategoryIcon } from "@/lib/category-icons";
 
 export default async function DashboardPage({
@@ -38,13 +39,23 @@ export default async function DashboardPage({
       : currencies[0];
   const fm = (c: number) => formatMoney(c, cur);
 
-  const [data, recent, recentIncomes, balance, topGoal] = await Promise.all([
-    getMonthlyDashboard(team.id, month, cur),
-    listExpenses(team.id, { month, currency: cur }),
-    listIncomes(team.id, { month, currency: cur }),
-    team.effortEnabled ? getTeamBalance(team.id, cur) : Promise.resolve(null),
-    team.goalsEnabled ? getTopGoal(team.id, user.id) : Promise.resolve(null),
-  ]);
+  const [data, recent, recentIncomes, balance, topGoal, upcomingCard] =
+    await Promise.all([
+      getMonthlyDashboard(team.id, month, cur),
+      listExpenses(team.id, { month, currency: cur }),
+      listIncomes(team.id, { month, currency: cur }),
+      team.effortEnabled ? getTeamBalance(team.id, cur) : Promise.resolve(null),
+      team.goalsEnabled ? getTopGoal(team.id, user.id) : Promise.resolve(null),
+      getUpcomingStatement(team.id),
+    ]);
+
+  const cardDays = upcomingCard
+    ? Math.round(
+        (new Date(upcomingCard.dueDate + "T00:00:00").getTime() -
+          new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime()) /
+          86400000,
+      )
+    : 0;
 
   const positive = data.balanceCents >= 0;
 
@@ -136,6 +147,36 @@ export default async function DashboardPage({
           </CardContent>
         </Card>
       </div>
+
+      {upcomingCard && (
+        <Link
+          href={`/tarjetas/${upcomingCard.id}/revisar`}
+          className="block rounded-xl border border-amber-500/40 bg-amber-500/[0.07] px-4 py-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[0.62rem] font-semibold uppercase tracking-wide text-amber-500">
+              💳{" "}
+              {cardDays <= 0
+                ? "Vence hoy"
+                : cardDays === 1
+                  ? "Vence mañana"
+                  : `Vence en ${cardDays} días`}
+            </p>
+            <span className="text-[0.7rem] tabular-nums text-muted-foreground">
+              {fmtDay(upcomingCard.dueDate)}
+            </span>
+          </div>
+          <p className="mt-1 text-lg font-bold tabular-nums">
+            {formatMoney(upcomingCard.totalArsCents, "ARS")}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {upcomingCard.label}
+            {upcomingCard.minPaymentArsCents
+              ? ` · mínimo ${formatMoney(upcomingCard.minPaymentArsCents, "ARS")}`
+              : ""}
+          </p>
+        </Link>
+      )}
 
       {balance?.suggestion && (
         <Link
