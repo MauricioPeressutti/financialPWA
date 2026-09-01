@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 
+import { AmountInput } from "@/components/ui/amount-input";
 import { effortPercents, splitShares } from "@/lib/effort";
-import { formatMoney, parseAmountToCents } from "@/lib/money";
+import { formatAmountInput, formatMoney, parseAmountToCents } from "@/lib/money";
 import { currencyMeta, type Currency } from "@/lib/currencies";
 
 type M = { userId: string; name: string; incomeCents: number };
@@ -17,7 +18,7 @@ export function QuickCalc({
   currency: string;
   colors: Record<string, string>;
 }) {
-  const [amount, setAmount] = useState("120000");
+  const [amount, setAmount] = useState(formatAmountInput("120000"));
   const cents = parseAmountToCents(amount) ?? 0;
   const sym = currencyMeta[currency as Currency]?.symbol ?? "$";
 
@@ -32,11 +33,10 @@ export function QuickCalc({
     <div>
       <div className="mb-3 flex items-center gap-2 rounded-xl border bg-[var(--field-surface)] px-3.5 py-3">
         <span className="font-semibold text-muted-foreground">{sym}</span>
-        <input
-          inputMode="numeric"
+        <AmountInput
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="w-full bg-transparent text-lg tabular-nums outline-none"
+          className="h-auto w-full border-0 bg-transparent p-0 text-lg tabular-nums shadow-none focus-visible:ring-0"
         />
       </div>
 

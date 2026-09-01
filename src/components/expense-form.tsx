@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
+import { AmountInput } from "@/components/ui/amount-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -243,10 +244,9 @@ export function ExpenseForm({
           <Label htmlFor="reimbursedAmount">
             ¿Te reintegraron algo? (opcional)
           </Label>
-          <Input
+          <AmountInput
             id="reimbursedAmount"
-            inputMode="decimal"
-            placeholder="Ej: MODO te devolvió al toque"
+            placeholder="0,00"
             {...form.register("reimbursedAmount")}
           />
           <p className="text-xs text-muted-foreground">

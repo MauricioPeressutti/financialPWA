@@ -4,10 +4,11 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { AmountInput } from "@/components/ui/amount-input";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { setMyDeclaredIncome } from "@/lib/actions/effort";
 import { currencyMeta, type Currency } from "@/lib/currencies";
+import { formatAmountInput } from "@/lib/money";
 
 export function IncomeRow({
   name,
@@ -25,7 +26,7 @@ export function IncomeRow({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [value, setValue] = useState(
-    incomeCents ? String(Math.round(incomeCents / 100)) : "",
+    incomeCents ? formatAmountInput(String(Math.round(incomeCents / 100))) : "",
   );
   const sym = currencyMeta[currency as Currency]?.symbol ?? "$";
 
@@ -54,8 +55,7 @@ export function IncomeRow({
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 rounded-lg border bg-[var(--field-surface)] px-2.5">
             <span className="text-xs text-muted-foreground">{sym}</span>
-            <Input
-              inputMode="numeric"
+            <AmountInput
               value={value}
               onChange={(e) => setValue(e.target.value)}
               className="h-8 w-24 border-0 bg-transparent px-0 text-right shadow-none focus-visible:ring-0"

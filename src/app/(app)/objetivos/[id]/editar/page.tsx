@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { GoalForm } from "@/components/goals/goal-form";
 import { requireTeam } from "@/lib/auth";
 import { getGoal } from "@/lib/goals";
+import { centsToAmountInput } from "@/lib/money";
 
 export default async function EditGoalPage({
   params,
@@ -28,7 +29,7 @@ export default async function EditGoalPage({
           id: goal.id,
           name: goal.name,
           emoji: goal.emoji,
-          targetAmount: (goal.targetCents / 100).toString(),
+          targetAmount: centsToAmountInput(goal.targetCents),
           currency: goal.currency,
           scope: goal.scope,
           targetDate: goal.targetDate ?? "",

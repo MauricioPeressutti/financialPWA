@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ExpenseForm } from "@/components/expense-form";
 import { requireTeam } from "@/lib/auth";
 import { getFxContext } from "@/lib/fx";
+import { centsToAmountInput } from "@/lib/money";
 import { getActiveCategories, getExpense, getSplitMembers } from "@/lib/queries";
 
 export default async function EditExpensePage({
@@ -36,7 +37,7 @@ export default async function EditExpensePage({
         }))}
         expense={{
           id: expense.id,
-          amount: (expense.amountCents / 100).toFixed(2),
+          amount: centsToAmountInput(expense.amountCents),
           currency: expense.currency,
           fxRate: expense.fxRate,
           spentOn: expense.spentOn,

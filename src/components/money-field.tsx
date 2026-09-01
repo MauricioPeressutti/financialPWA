@@ -3,6 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect } from "react";
 
+import { AmountInput } from "@/components/ui/amount-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { currencyMeta, type Currency } from "@/lib/currencies";
@@ -60,9 +61,8 @@ export function MoneyField({
       <div className="flex gap-2">
         <div className="flex flex-1 items-center gap-1.5 rounded-md border bg-[var(--field-surface)] px-3">
           <span className="text-sm text-muted-foreground">{sym}</span>
-          <Input
+          <AmountInput
             id="amount"
-            inputMode="decimal"
             placeholder="0,00"
             autoFocus
             className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"

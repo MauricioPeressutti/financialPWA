@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
+import { AmountInput } from "@/components/ui/amount-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -89,8 +90,7 @@ export function ReimbursementSection({
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
             <Label className="text-xs">Monto</Label>
-            <Input
-              inputMode="decimal"
+            <AmountInput
               placeholder="0,00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}

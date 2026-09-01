@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AmountInput } from "@/components/ui/amount-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addContribution } from "@/lib/actions/goals";
@@ -47,8 +48,7 @@ export function AddContribution({
             <Label>Monto ({currency})</Label>
             <div className="flex items-center gap-1.5 rounded-md border bg-[var(--field-surface)] px-3">
               <span className="text-sm text-muted-foreground">{sym}</span>
-              <Input
-                inputMode="numeric"
+              <AmountInput
                 autoFocus
                 value={amount}
                 placeholder="0"

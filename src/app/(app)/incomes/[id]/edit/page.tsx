@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { IncomeForm } from "@/components/income-form";
 import { requireTeam } from "@/lib/auth";
 import { getFxContext } from "@/lib/fx";
+import { centsToAmountInput } from "@/lib/money";
 import { getActiveCategories, getIncome } from "@/lib/queries";
 
 export default async function EditIncomePage({
@@ -29,7 +30,7 @@ export default async function EditIncomePage({
         fxReferenceLabel={fx.fxReferenceLabel}
         income={{
           id: income.id,
-          amount: (income.amountCents / 100).toFixed(2),
+          amount: centsToAmountInput(income.amountCents),
           currency: income.currency,
           fxRate: income.fxRate,
           receivedOn: income.receivedOn,
