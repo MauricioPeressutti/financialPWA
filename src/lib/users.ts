@@ -8,13 +8,23 @@ import { categories, subcategories, teamMembers, teams, users } from "@/db/schem
 
 const DEFAULT_CATEGORIES: Record<string, string[]> = {
   Supermercado: ["Comida", "Limpieza", "Bebidas"],
-  Hogar: ["Alquiler", "Expensas", "Servicios", "Muebles"],
+  Hogar: ["Alquiler", "Expensas", "Muebles"],
+  Servicios: ["Luz", "Agua", "Gas", "Internet", "Celular", "Seguro"],
   Transporte: ["Nafta", "SUBE", "Taxi/App", "Mantenimiento"],
   Delivery: ["Rappi", "PedidosYa", "Uber Eats", "Otro"],
   Salud: ["Farmacia", "Obra social", "Consultas"],
   "Farmacia online": [],
   Kiosco: [],
-  Ocio: ["Salidas", "Streaming", "Viajes"],
+  Ocio: ["Salidas", "Restaurante", "Streaming", "Viajes"],
+  Deporte: ["Gimnasio", "Club/Cancha", "Clases", "Equipamiento"],
+  Indumentaria: ["Ropa", "Calzado", "Accesorios"],
+  "Cuidado personal": [
+    "Peluquería",
+    "Cosmética",
+    "Uñas",
+    "Estética",
+    "Perfumería",
+  ],
   Otros: [],
 };
 
