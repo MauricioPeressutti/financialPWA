@@ -83,8 +83,8 @@ export function AnalyticsRange({
       </div>
 
       {open && (
-        <div className="flex items-end gap-2 rounded-lg border p-2 text-xs">
-          <label className="flex-1 space-y-1">
+        <div className="grid grid-cols-2 gap-2 rounded-lg border p-2 text-xs">
+          <label className="min-w-0 space-y-1">
             <span className="block text-muted-foreground">Desde</span>
             <Input
               type="date"
@@ -94,10 +94,10 @@ export function AnalyticsRange({
                 setFrom(e.target.value);
                 applyCustom(e.target.value, to);
               }}
-              className="h-8"
+              className="h-8 w-full px-2"
             />
           </label>
-          <label className="flex-1 space-y-1">
+          <label className="min-w-0 space-y-1">
             <span className="block text-muted-foreground">Hasta</span>
             <Input
               type="date"
@@ -108,7 +108,7 @@ export function AnalyticsRange({
                 setTo(e.target.value);
                 applyCustom(from, e.target.value);
               }}
-              className="h-8"
+              className="h-8 w-full px-2"
             />
           </label>
         </div>
