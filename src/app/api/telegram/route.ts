@@ -509,14 +509,18 @@ export async function POST(req: Request) {
     try {
       const chat =
         update.message?.chat.id ?? update.callback_query?.message?.chat.id;
+      const msg = String(err instanceof Error ? err.message : err);
+      const saturated = /saturad|503|429|UNAVAILABLE|high demand/i.test(msg);
       const detail =
-        process.env.TELEGRAM_DEBUG === "1"
-          ? `\n\n<code>${String(err instanceof Error ? err.message : err).slice(0, 400)}</code>`
+        process.env.TELEGRAM_DEBUG === "1" && !saturated
+          ? `\n\n<code>${msg.slice(0, 400)}</code>`
           : "";
       if (chat)
         await sendMessage(
           chat,
-          "Uf, algo falló procesando eso. Probá de nuevo." + detail,
+          saturated
+            ? "⏳ El servicio está saturado por un ratito. Reenviame el mensaje en un minuto y lo cargo 🙏"
+            : "Uf, algo falló procesando eso. Probá de nuevo." + detail,
         );
     } catch {}
   }
