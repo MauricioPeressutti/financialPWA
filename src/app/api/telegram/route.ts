@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
 
@@ -16,6 +17,7 @@ import { insertExpense } from "@/lib/expenses-core";
 import { insertIncome } from "@/lib/income-core";
 import { fxForMovement } from "@/lib/fx";
 import {
+  isSaturatedError,
   parseExpenseMessage,
   parseReceiptImage,
   parseReceiptText,
@@ -44,6 +46,8 @@ import {
 } from "@/lib/telegram";
 
 export const runtime = "nodejs";
+// El reintento en 2° plano (after) puede tardar ~90s si Gemini está saturado.
+export const maxDuration = 120;
 
 const OK = () => new Response("ok");
 
@@ -318,6 +322,145 @@ async function teamOf(userId: string) {
   return m?.teamId ?? null;
 }
 
+type TgDoc = NonNullable<NonNullable<TgUpdate["message"]>["document"]>;
+type ParseTree = { name: string; subcategories: { name: string }[] }[];
+
+type MovementCtx = {
+  chatId: number;
+  teamId: string;
+  userId: string;
+  text: string;
+  fileId: string | null;
+  doc: TgDoc | null;
+  caption: string | undefined;
+  expCats: Cat[];
+  incCats: Cat[];
+  parseOpts: {
+    expenseCategories: ParseTree;
+    incomeCategories: ParseTree;
+    today: string;
+  };
+};
+
+/**
+ * Parsea el mensaje/comprobante con Gemini y carga el movimiento. Manda sus
+ * propios mensajes. Si Gemini está saturado (503/429): la primera vez avisa y
+ * reprograma un reintento en 2° plano (`after`, backoff largo); si ese también
+ * falla, avisa que no pudo. El usuario no tiene que reenviar nada.
+ */
+async function finishMovement(c: MovementCtx, long: boolean): Promise<void> {
+  let parsed: ParsedMovement | null;
+  try {
+    if (c.fileId) {
+      await sendChatAction(c.chatId, "typing");
+      const file = await getTelegramFile(c.fileId);
+      if (!file) {
+        await sendMessage(
+          c.chatId,
+          "No pude bajar el archivo (¿muy pesado?). Sacá una foto más liviana o cargalo por texto.",
+        );
+        return;
+      }
+      const isPdf =
+        file.mimeType === "application/pdf" ||
+        c.doc?.mime_type === "application/pdf" ||
+        /\.pdf$/i.test(c.doc?.file_name ?? "");
+      const pdfText = isPdf
+        ? await extractPdfText(Buffer.from(file.base64, "base64"))
+        : "";
+      console.log("[tg] file", {
+        docMime: c.doc?.mime_type,
+        fileMime: file.mimeType,
+        isPdf,
+        pdfChars: pdfText.length,
+      });
+      parsed =
+        pdfText.length > 15
+          ? await parseReceiptText(
+              pdfText,
+              { ...c.parseOpts, caption: c.caption },
+              { long },
+            )
+          : await parseReceiptImage(
+              { ...file, caption: c.caption },
+              c.parseOpts,
+              { long },
+            );
+    } else {
+      parsed = await parseExpenseMessage(c.text, c.parseOpts, { long });
+    }
+  } catch (err) {
+    if (!isSaturatedError(err)) throw err;
+    if (!long) {
+      await sendMessage(
+        c.chatId,
+        "⏳ El servicio de IA está saturado por un rato. Lo sigo intentando solo — te aviso apenas lo cargue, no hace falta que reenvíes nada.",
+      );
+      after(() =>
+        finishMovement(c, true).catch((e) =>
+          console.error("tg reintento en 2° plano:", e),
+        ),
+      );
+    } else {
+      await sendMessage(
+        c.chatId,
+        "😕 No pude cargarlo: el servicio de IA sigue caído después de varios intentos. Reenviámelo más tarde 🙏",
+      );
+    }
+    return;
+  }
+
+  if (!parsed || parsed.amount === null || parsed.amount <= 0) {
+    await sendMessage(
+      c.chatId,
+      c.fileId
+        ? "No pude leer el total del comprobante. Probá con una foto más nítida, o escribime el gasto."
+        : "No pude sacar el monto. Probá algo como <i>“5000 super débito”</i> o <i>“cobré 30000 por transferencia”</i>.",
+    );
+    return;
+  }
+
+  const amountCents = Math.round(parsed.amount * 100);
+
+  // ── no se entiende si es gasto o ingreso → preguntar ──
+  if (!parsed.kindClear) {
+    await db
+      .delete(pendingMovements)
+      .where(lt(pendingMovements.createdAt, new Date(Date.now() - 2 * 86400000)));
+    const [p] = await db
+      .insert(pendingMovements)
+      .values({ teamId: c.teamId, userId: c.userId, payload: parsed })
+      .returning({ id: pendingMovements.id });
+    await sendMessage(
+      c.chatId,
+      `🤔 <b>${formatMoney(amountCents, parsed.currency)}</b>${
+        parsed.description ? ` · ${parsed.description}` : ""
+      }\n¿Fue un <b>gasto</b> o un <b>ingreso</b>?`,
+      [
+        [
+          { text: "🔻 Gasto", callback_data: `pk:${p.id}:gasto` },
+          { text: "💰 Ingreso", callback_data: `pk:${p.id}:ingreso` },
+        ],
+      ],
+    );
+    return;
+  }
+
+  const res = await commitMovement(
+    c.teamId,
+    c.userId,
+    parsed.kind,
+    parsed,
+    c.expCats,
+    c.incCats,
+  );
+  if ("errorMsg" in res) {
+    await sendMessage(c.chatId, res.errorMsg);
+    return;
+  }
+  await sendMessage(c.chatId, res.text, res.keyboard);
+}
+
 export async function POST(req: Request) {
   if (
     req.headers.get("x-telegram-bot-api-secret-token") !==
@@ -421,90 +564,21 @@ export async function POST(req: Request) {
     };
 
     const caption = msg.caption?.trim();
-    let parsed: ParsedMovement | null;
-    if (fileId) {
-      await sendChatAction(chatId, "typing");
-      const file = await getTelegramFile(fileId);
-      if (!file) {
-        await sendMessage(
-          chatId,
-          "No pude bajar el archivo (¿muy pesado?). Sacá una foto más liviana o cargalo por texto.",
-        );
-        return OK();
-      }
-      const isPdf =
-        file.mimeType === "application/pdf" ||
-        doc?.mime_type === "application/pdf" ||
-        /\.pdf$/i.test(doc?.file_name ?? "");
-      const pdfText = isPdf
-        ? await extractPdfText(Buffer.from(file.base64, "base64"))
-        : "";
-      console.log("[tg] file", {
-        docMime: doc?.mime_type,
-        fileMime: file.mimeType,
-        isPdf,
-        pdfChars: pdfText.length,
-      });
-      if (pdfText.length > 15) {
-        parsed = await parseReceiptText(pdfText, { ...parseOpts, caption });
-      } else {
-        parsed = await parseReceiptImage({ ...file, caption }, parseOpts);
-      }
-    } else {
-      parsed = await parseExpenseMessage(text, parseOpts);
-    }
-
-    if (!parsed || parsed.amount === null || parsed.amount <= 0) {
-      await sendMessage(
+    await finishMovement(
+      {
         chatId,
-        fileId
-          ? "No pude leer el total del comprobante. Probá con una foto más nítida, o escribime el gasto."
-          : "No pude sacar el monto. Probá algo como <i>“5000 super débito”</i> o <i>“cobré 30000 por transferencia”</i>.",
-      );
-      return OK();
-    }
-
-    const amountCents = Math.round(parsed.amount * 100);
-
-    // ── no se entiende si es gasto o ingreso → preguntar ──
-    if (!parsed.kindClear) {
-      await db
-        .delete(pendingMovements)
-        .where(
-          lt(pendingMovements.createdAt, new Date(Date.now() - 2 * 86400000)),
-        );
-      const [p] = await db
-        .insert(pendingMovements)
-        .values({ teamId, userId: link.userId, payload: parsed })
-        .returning({ id: pendingMovements.id });
-      await sendMessage(
-        chatId,
-        `🤔 <b>${formatMoney(amountCents, parsed.currency)}</b>${
-          parsed.description ? ` · ${parsed.description}` : ""
-        }\n¿Fue un <b>gasto</b> o un <b>ingreso</b>?`,
-        [
-          [
-            { text: "🔻 Gasto", callback_data: `pk:${p.id}:gasto` },
-            { text: "💰 Ingreso", callback_data: `pk:${p.id}:ingreso` },
-          ],
-        ],
-      );
-      return OK();
-    }
-
-    const res = await commitMovement(
-      teamId,
-      link.userId,
-      parsed.kind,
-      parsed,
-      expCats,
-      incCats,
+        teamId,
+        userId: link.userId,
+        text,
+        fileId,
+        doc,
+        caption,
+        expCats,
+        incCats,
+        parseOpts,
+      },
+      false,
     );
-    if ("errorMsg" in res) {
-      await sendMessage(chatId, res.errorMsg);
-      return OK();
-    }
-    await sendMessage(chatId, res.text, res.keyboard);
   } catch (err) {
     console.error("telegram webhook error:", err);
     try {
