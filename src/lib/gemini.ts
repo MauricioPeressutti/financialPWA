@@ -7,46 +7,6 @@ import { INCOME_METHODS, incomeMethodMeta } from "@/lib/income-methods";
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-// Backoff corto (dentro del request del webhook) y largo (reintento en 2° plano).
-const SHORT_WAITS = [1000, 2500, 5000]; // ~8.5s
-const LONG_WAITS = [4000, 8000, 15000, 25000, 40000]; // ~92s, 6 intentos
-
-/** true si el error es un 503/429 de Gemini (modelo saturado / rate limit). */
-export function isSaturatedError(err: unknown): boolean {
-  const m = String(err instanceof Error ? err.message : err);
-  return /gemini saturado|503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|high demand/i.test(
-    m,
-  );
-}
-
-/**
- * POST a Gemini con reintentos ante 503 (modelo saturado) y 429 (rate limit).
- */
-async function geminiFetch(
-  apiKey: string,
-  body: unknown,
-  waits: number[] = SHORT_WAITS,
-): Promise<Response> {
-  let last: Response | null = null;
-  for (let i = 0; i <= waits.length; i++) {
-    const res = await fetch(`${ENDPOINT}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) return res;
-    last = res;
-    if (res.status !== 503 && res.status !== 429) return res;
-    if (i < waits.length) {
-      console.warn(`gemini ${res.status}, reintento ${i + 1}/${waits.length}`);
-      await sleep(waits[i]);
-    }
-  }
-  return last!;
-}
-
 export type ParsedMovement = {
   kind: "gasto" | "ingreso";
   kindClear: boolean; // false => hay que preguntarle al usuario
@@ -166,7 +126,6 @@ async function callGemini(
   system: string,
   parts: GeminiPart[],
   today: string,
-  long = false,
 ): Promise<ParsedMovement | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("Falta GEMINI_API_KEY");
@@ -206,13 +165,14 @@ async function callGemini(
     },
   };
 
-  const res = await geminiFetch(apiKey, body, long ? LONG_WAITS : SHORT_WAITS);
+  const res = await fetch(`${ENDPOINT}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 
   if (!res.ok) {
     const err = await res.text();
-    if (res.status === 503 || res.status === 429) {
-      throw new Error(`Gemini saturado (${res.status})`);
-    }
     throw new Error(`Gemini ${res.status}: ${err.slice(0, 300)}`);
   }
 
@@ -257,18 +217,14 @@ async function callGemini(
   }
 }
 
-type ParseFlags = { long?: boolean };
-
 export function parseExpenseMessage(
   text: string,
   opts: ParseOpts,
-  flags?: ParseFlags,
 ): Promise<ParsedMovement | null> {
   return callGemini(
     buildSystemPrompt(opts, false),
     [{ text }],
     opts.today,
-    flags?.long,
   );
 }
 
@@ -276,7 +232,6 @@ export function parseExpenseMessage(
 export function parseReceiptImage(
   file: { base64: string; mimeType: string; caption?: string },
   opts: ParseOpts,
-  flags?: ParseFlags,
 ): Promise<ParsedMovement | null> {
   const parts: GeminiPart[] = [
     { inlineData: { mimeType: file.mimeType, data: file.base64 } },
@@ -286,14 +241,13 @@ export function parseReceiptImage(
         "Extraé el movimiento de este comprobante.",
     },
   ];
-  return callGemini(buildSystemPrompt(opts, true), parts, opts.today, flags?.long);
+  return callGemini(buildSystemPrompt(opts, true), parts, opts.today);
 }
 
 /** Extrae el movimiento del texto de un comprobante (capa de texto de un PDF). */
 export function parseReceiptText(
   pdfText: string,
   opts: ParseOpts & { caption?: string },
-  flags?: ParseFlags,
 ): Promise<ParsedMovement | null> {
   const text = [
     "Texto extraído de un comprobante en PDF:",
@@ -304,10 +258,5 @@ export function parseReceiptText(
   ]
     .filter(Boolean)
     .join("\n");
-  return callGemini(
-    buildSystemPrompt(opts, true),
-    [{ text }],
-    opts.today,
-    flags?.long,
-  );
+  return callGemini(buildSystemPrompt(opts, true), [{ text }], opts.today);
 }

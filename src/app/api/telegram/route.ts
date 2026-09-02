@@ -1,4 +1,3 @@
-import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
 
@@ -11,14 +10,12 @@ import {
   teamMembers,
   teams,
   telegramLinks,
-  tgProcessedUpdates,
 } from "@/db/schema";
 import { isCurrency } from "@/lib/currencies";
 import { insertExpense } from "@/lib/expenses-core";
 import { insertIncome } from "@/lib/income-core";
 import { fxForMovement } from "@/lib/fx";
 import {
-  isSaturatedError,
   parseExpenseMessage,
   parseReceiptImage,
   parseReceiptText,
@@ -47,8 +44,6 @@ import {
 } from "@/lib/telegram";
 
 export const runtime = "nodejs";
-// El reintento en 2° plano (after) puede tardar ~90s si Gemini está saturado.
-export const maxDuration = 120;
 
 const OK = () => new Response("ok");
 
@@ -323,145 +318,6 @@ async function teamOf(userId: string) {
   return m?.teamId ?? null;
 }
 
-type TgDoc = NonNullable<NonNullable<TgUpdate["message"]>["document"]>;
-type ParseTree = { name: string; subcategories: { name: string }[] }[];
-
-type MovementCtx = {
-  chatId: number;
-  teamId: string;
-  userId: string;
-  text: string;
-  fileId: string | null;
-  doc: TgDoc | null;
-  caption: string | undefined;
-  expCats: Cat[];
-  incCats: Cat[];
-  parseOpts: {
-    expenseCategories: ParseTree;
-    incomeCategories: ParseTree;
-    today: string;
-  };
-};
-
-/**
- * Parsea el mensaje/comprobante con Gemini y carga el movimiento. Manda sus
- * propios mensajes. Si Gemini está saturado (503/429): la primera vez avisa y
- * reprograma un reintento en 2° plano (`after`, backoff largo); si ese también
- * falla, avisa que no pudo. El usuario no tiene que reenviar nada.
- */
-async function finishMovement(c: MovementCtx, long: boolean): Promise<void> {
-  let parsed: ParsedMovement | null;
-  try {
-    if (c.fileId) {
-      await sendChatAction(c.chatId, "typing");
-      const file = await getTelegramFile(c.fileId);
-      if (!file) {
-        await sendMessage(
-          c.chatId,
-          "No pude bajar el archivo (¿muy pesado?). Sacá una foto más liviana o cargalo por texto.",
-        );
-        return;
-      }
-      const isPdf =
-        file.mimeType === "application/pdf" ||
-        c.doc?.mime_type === "application/pdf" ||
-        /\.pdf$/i.test(c.doc?.file_name ?? "");
-      const pdfText = isPdf
-        ? await extractPdfText(Buffer.from(file.base64, "base64"))
-        : "";
-      console.log("[tg] file", {
-        docMime: c.doc?.mime_type,
-        fileMime: file.mimeType,
-        isPdf,
-        pdfChars: pdfText.length,
-      });
-      parsed =
-        pdfText.length > 15
-          ? await parseReceiptText(
-              pdfText,
-              { ...c.parseOpts, caption: c.caption },
-              { long },
-            )
-          : await parseReceiptImage(
-              { ...file, caption: c.caption },
-              c.parseOpts,
-              { long },
-            );
-    } else {
-      parsed = await parseExpenseMessage(c.text, c.parseOpts, { long });
-    }
-  } catch (err) {
-    if (!isSaturatedError(err)) throw err;
-    if (!long) {
-      await sendMessage(
-        c.chatId,
-        "⏳ El servicio de IA está saturado por un rato. Lo sigo intentando solo — te aviso apenas lo cargue, no hace falta que reenvíes nada.",
-      );
-      after(() =>
-        finishMovement(c, true).catch((e) =>
-          console.error("tg reintento en 2° plano:", e),
-        ),
-      );
-    } else {
-      await sendMessage(
-        c.chatId,
-        "😕 No pude cargarlo: el servicio de IA sigue caído después de varios intentos. Reenviámelo más tarde 🙏",
-      );
-    }
-    return;
-  }
-
-  if (!parsed || parsed.amount === null || parsed.amount <= 0) {
-    await sendMessage(
-      c.chatId,
-      c.fileId
-        ? "No pude leer el total del comprobante. Probá con una foto más nítida, o escribime el gasto."
-        : "No pude sacar el monto. Probá algo como <i>“5000 super débito”</i> o <i>“cobré 30000 por transferencia”</i>.",
-    );
-    return;
-  }
-
-  const amountCents = Math.round(parsed.amount * 100);
-
-  // ── no se entiende si es gasto o ingreso → preguntar ──
-  if (!parsed.kindClear) {
-    await db
-      .delete(pendingMovements)
-      .where(lt(pendingMovements.createdAt, new Date(Date.now() - 2 * 86400000)));
-    const [p] = await db
-      .insert(pendingMovements)
-      .values({ teamId: c.teamId, userId: c.userId, payload: parsed })
-      .returning({ id: pendingMovements.id });
-    await sendMessage(
-      c.chatId,
-      `🤔 <b>${formatMoney(amountCents, parsed.currency)}</b>${
-        parsed.description ? ` · ${parsed.description}` : ""
-      }\n¿Fue un <b>gasto</b> o un <b>ingreso</b>?`,
-      [
-        [
-          { text: "🔻 Gasto", callback_data: `pk:${p.id}:gasto` },
-          { text: "💰 Ingreso", callback_data: `pk:${p.id}:ingreso` },
-        ],
-      ],
-    );
-    return;
-  }
-
-  const res = await commitMovement(
-    c.teamId,
-    c.userId,
-    parsed.kind,
-    parsed,
-    c.expCats,
-    c.incCats,
-  );
-  if ("errorMsg" in res) {
-    await sendMessage(c.chatId, res.errorMsg);
-    return;
-  }
-  await sendMessage(c.chatId, res.text, res.keyboard);
-}
-
 export async function POST(req: Request) {
   if (
     req.headers.get("x-telegram-bot-api-secret-token") !==
@@ -475,20 +331,6 @@ export async function POST(req: Request) {
     update = (await req.json()) as TgUpdate;
   } catch {
     return OK();
-  }
-
-  // Dedupe: Telegram re-entrega el update si el webhook tarda. Si ya lo vimos, salimos.
-  if (typeof update.update_id === "number") {
-    try {
-      const ins = await db
-        .insert(tgProcessedUpdates)
-        .values({ updateId: update.update_id })
-        .onConflictDoNothing()
-        .returning({ updateId: tgProcessedUpdates.updateId });
-      if (ins.length === 0) return OK(); // ya procesado
-    } catch (e) {
-      console.error("tg dedupe:", e);
-    }
   }
 
   try {
@@ -579,55 +421,103 @@ export async function POST(req: Request) {
     };
 
     const caption = msg.caption?.trim();
-    const ctx: MovementCtx = {
-      chatId,
+    let parsed: ParsedMovement | null;
+    if (fileId) {
+      await sendChatAction(chatId, "typing");
+      const file = await getTelegramFile(fileId);
+      if (!file) {
+        await sendMessage(
+          chatId,
+          "No pude bajar el archivo (¿muy pesado?). Sacá una foto más liviana o cargalo por texto.",
+        );
+        return OK();
+      }
+      const isPdf =
+        file.mimeType === "application/pdf" ||
+        doc?.mime_type === "application/pdf" ||
+        /\.pdf$/i.test(doc?.file_name ?? "");
+      const pdfText = isPdf
+        ? await extractPdfText(Buffer.from(file.base64, "base64"))
+        : "";
+      console.log("[tg] file", {
+        docMime: doc?.mime_type,
+        fileMime: file.mimeType,
+        isPdf,
+        pdfChars: pdfText.length,
+      });
+      if (pdfText.length > 15) {
+        parsed = await parseReceiptText(pdfText, { ...parseOpts, caption });
+      } else {
+        parsed = await parseReceiptImage({ ...file, caption }, parseOpts);
+      }
+    } else {
+      parsed = await parseExpenseMessage(text, parseOpts);
+    }
+
+    if (!parsed || parsed.amount === null || parsed.amount <= 0) {
+      await sendMessage(
+        chatId,
+        fileId
+          ? "No pude leer el total del comprobante. Probá con una foto más nítida, o escribime el gasto."
+          : "No pude sacar el monto. Probá algo como <i>“5000 super débito”</i> o <i>“cobré 30000 por transferencia”</i>.",
+      );
+      return OK();
+    }
+
+    const amountCents = Math.round(parsed.amount * 100);
+
+    // ── no se entiende si es gasto o ingreso → preguntar ──
+    if (!parsed.kindClear) {
+      await db
+        .delete(pendingMovements)
+        .where(
+          lt(pendingMovements.createdAt, new Date(Date.now() - 2 * 86400000)),
+        );
+      const [p] = await db
+        .insert(pendingMovements)
+        .values({ teamId, userId: link.userId, payload: parsed })
+        .returning({ id: pendingMovements.id });
+      await sendMessage(
+        chatId,
+        `🤔 <b>${formatMoney(amountCents, parsed.currency)}</b>${
+          parsed.description ? ` · ${parsed.description}` : ""
+        }\n¿Fue un <b>gasto</b> o un <b>ingreso</b>?`,
+        [
+          [
+            { text: "🔻 Gasto", callback_data: `pk:${p.id}:gasto` },
+            { text: "💰 Ingreso", callback_data: `pk:${p.id}:ingreso` },
+          ],
+        ],
+      );
+      return OK();
+    }
+
+    const res = await commitMovement(
       teamId,
-      userId: link.userId,
-      text,
-      fileId,
-      doc,
-      caption,
+      link.userId,
+      parsed.kind,
+      parsed,
       expCats,
       incCats,
-      parseOpts,
-    };
-
-    // Respondé YA a Telegram (para que no re-entregue) y procesá en 2° plano.
-    await sendChatAction(chatId, "typing");
-    after(async () => {
-      await finishMovement(ctx, false).catch((e) =>
-        console.error("tg movimiento:", e),
-      );
-      // limpieza esporádica del dedupe
-      if (Math.random() < 0.05) {
-        await db
-          .delete(tgProcessedUpdates)
-          .where(
-            lt(
-              tgProcessedUpdates.at,
-              new Date(Date.now() - 3 * 86400000),
-            ),
-          )
-          .catch(() => {});
-      }
-    });
+    );
+    if ("errorMsg" in res) {
+      await sendMessage(chatId, res.errorMsg);
+      return OK();
+    }
+    await sendMessage(chatId, res.text, res.keyboard);
   } catch (err) {
     console.error("telegram webhook error:", err);
     try {
       const chat =
         update.message?.chat.id ?? update.callback_query?.message?.chat.id;
-      const msg = String(err instanceof Error ? err.message : err);
-      const saturated = /saturad|503|429|UNAVAILABLE|high demand/i.test(msg);
       const detail =
-        process.env.TELEGRAM_DEBUG === "1" && !saturated
-          ? `\n\n<code>${msg.slice(0, 400)}</code>`
+        process.env.TELEGRAM_DEBUG === "1"
+          ? `\n\n<code>${String(err instanceof Error ? err.message : err).slice(0, 400)}</code>`
           : "";
       if (chat)
         await sendMessage(
           chat,
-          saturated
-            ? "⏳ El servicio está saturado por un ratito. Reenviame el mensaje en un minuto y lo cargo 🙏"
-            : "Uf, algo falló procesando eso. Probá de nuevo." + detail,
+          "Uf, algo falló procesando eso. Probá de nuevo." + detail,
         );
     } catch {}
   }

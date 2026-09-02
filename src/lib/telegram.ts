@@ -120,7 +120,6 @@ type TgDocument = {
 
 /** Telegram update payload (solo lo que usamos). */
 export type TgUpdate = {
-  update_id?: number;
   message?: {
     message_id: number;
     from?: { id: number; first_name?: string };
