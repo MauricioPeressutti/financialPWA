@@ -7,6 +7,35 @@ import { INCOME_METHODS, incomeMethodMeta } from "@/lib/income-methods";
 const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * POST a Gemini con reintentos ante 503 (modelo saturado) y 429 (rate limit).
+ * Backoff: 1s, 2.5s, 5s. Total ~8.5s antes de rendirse.
+ */
+async function geminiFetch(
+  apiKey: string,
+  body: unknown,
+): Promise<Response> {
+  const waits = [1000, 2500, 5000];
+  let last: Response | null = null;
+  for (let i = 0; i <= waits.length; i++) {
+    const res = await fetch(`${ENDPOINT}?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return res;
+    last = res;
+    if (res.status !== 503 && res.status !== 429) return res;
+    if (i < waits.length) {
+      console.warn(`gemini ${res.status}, reintento ${i + 1}/${waits.length}`);
+      await sleep(waits[i]);
+    }
+  }
+  return last!;
+}
+
 export type ParsedMovement = {
   kind: "gasto" | "ingreso";
   kindClear: boolean; // false => hay que preguntarle al usuario
@@ -165,14 +194,15 @@ async function callGemini(
     },
   };
 
-  const res = await fetch(`${ENDPOINT}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const res = await geminiFetch(apiKey, body);
 
   if (!res.ok) {
     const err = await res.text();
+    if (res.status === 503 || res.status === 429) {
+      throw new Error(
+        "El servicio está saturado ahora mismo. Probá de nuevo en un minuto 🙏",
+      );
+    }
     throw new Error(`Gemini ${res.status}: ${err.slice(0, 300)}`);
   }
 
