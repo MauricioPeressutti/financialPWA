@@ -4,7 +4,10 @@ import { PAYMENT_METHODS, paymentMethodMeta } from "@/lib/payment-methods";
 import { INCOME_METHODS, incomeMethodMeta } from "@/lib/income-methods";
 
 // Se puede sobreescribir con la env var GEMINI_MODEL sin tocar el código.
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+// flash-lite tiene ~1.000 requests/día y 15/min en el tier gratuito (vs ~250/día
+// de flash) y su cuota diaria es INDEPENDIENTE de la de flash. Para parsear
+// "gasté 2500 en gas" alcanza y sobra, y aguanta mejor los picos de demanda.
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 export type ParsedMovement = {
