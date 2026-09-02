@@ -11,6 +11,7 @@ import {
   teamMembers,
   teams,
   telegramLinks,
+  tgProcessedUpdates,
 } from "@/db/schema";
 import { isCurrency } from "@/lib/currencies";
 import { insertExpense } from "@/lib/expenses-core";
@@ -476,6 +477,20 @@ export async function POST(req: Request) {
     return OK();
   }
 
+  // Dedupe: Telegram re-entrega el update si el webhook tarda. Si ya lo vimos, salimos.
+  if (typeof update.update_id === "number") {
+    try {
+      const ins = await db
+        .insert(tgProcessedUpdates)
+        .values({ updateId: update.update_id })
+        .onConflictDoNothing()
+        .returning({ updateId: tgProcessedUpdates.updateId });
+      if (ins.length === 0) return OK(); // ya procesado
+    } catch (e) {
+      console.error("tg dedupe:", e);
+    }
+  }
+
   try {
     if (update.callback_query) {
       await handleCallback(update.callback_query);
@@ -564,21 +579,38 @@ export async function POST(req: Request) {
     };
 
     const caption = msg.caption?.trim();
-    await finishMovement(
-      {
-        chatId,
-        teamId,
-        userId: link.userId,
-        text,
-        fileId,
-        doc,
-        caption,
-        expCats,
-        incCats,
-        parseOpts,
-      },
-      false,
-    );
+    const ctx: MovementCtx = {
+      chatId,
+      teamId,
+      userId: link.userId,
+      text,
+      fileId,
+      doc,
+      caption,
+      expCats,
+      incCats,
+      parseOpts,
+    };
+
+    // Respondé YA a Telegram (para que no re-entregue) y procesá en 2° plano.
+    await sendChatAction(chatId, "typing");
+    after(async () => {
+      await finishMovement(ctx, false).catch((e) =>
+        console.error("tg movimiento:", e),
+      );
+      // limpieza esporádica del dedupe
+      if (Math.random() < 0.05) {
+        await db
+          .delete(tgProcessedUpdates)
+          .where(
+            lt(
+              tgProcessedUpdates.at,
+              new Date(Date.now() - 3 * 86400000),
+            ),
+          )
+          .catch(() => {});
+      }
+    });
   } catch (err) {
     console.error("telegram webhook error:", err);
     try {

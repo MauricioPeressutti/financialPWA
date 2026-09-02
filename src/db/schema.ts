@@ -94,6 +94,12 @@ export const pendingMovements = pgTable("pending_movements", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── Dedupe de updates de Telegram (webhook re-entregado) ──
+export const tgProcessedUpdates = pgTable("tg_processed_updates", {
+  updateId: bigint("update_id", { mode: "number" }).primaryKey(),
+  at: timestamp("at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ─── Equipos ───────────────────────────────────────────
 export const teams = pgTable("teams", {
   id: uuid("id").defaultRandom().primaryKey(),
