@@ -82,6 +82,7 @@ export async function importStatement(
       paymentMethod: "credito",
       description: desc.slice(0, 160),
       spentOn: /^\d{4}-\d{2}-\d{2}$/.test(spentOn) ? spentOn : period,
+      statementId: st.id,
     });
     log.created.push(id);
   }
@@ -104,6 +105,7 @@ export async function importStatement(
           paymentMethod: "credito",
           description: `Cargos e impuestos — ${st.label}`.slice(0, 160),
           spentOn: period,
+          statementId: st.id,
         });
         log.created.push(id);
       }
