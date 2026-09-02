@@ -117,6 +117,7 @@ function renderMovement(a: {
   catName: string;
   subName: string | null;
   method: string | null; // null = todavía sin elegir
+  entity?: string | null;
   reimbursedCents: number | null;
   description: string | null;
   on: string;
@@ -146,6 +147,7 @@ function renderMovement(a: {
     `${icon} <b>${income ? "+" : "−"}${fmt(a.amountCents)}</b> · ${a.catName}${a.subName ? ` · ${a.subName}` : ""}${methodPart}`,
   ];
   if (foreign) lines.push(`≈ ${formatCents(a.baseAmountCents!)}`);
+  if (a.entity) lines.push(`🏦 ${a.entity}`);
   if (a.reimbursedCents)
     lines.push(`↩️ reintegro ${fmt(a.reimbursedCents)}`);
   if (a.description) lines.push(`<i>${a.description}</i>`);
@@ -231,6 +233,7 @@ async function commitMovement(
       categoryId: cat.id,
       subcategoryId: sub?.id ?? null,
       method,
+      entity: p.entity || null,
       description: p.description || null,
       receivedOn: on,
       source: "telegram",
@@ -246,6 +249,7 @@ async function commitMovement(
       catName: cat.name,
       subName: sub?.name ?? null,
       method: stated ? method : null,
+      entity: p.entity || null,
       reimbursedCents: null,
       description: p.description || null,
       on,
@@ -271,6 +275,7 @@ async function commitMovement(
     categoryId: cat.id,
     subcategoryId: sub?.id ?? null,
     paymentMethod: method,
+    entity: p.entity || null,
     description: p.description || null,
     spentOn: on,
     reimbursedCents,
@@ -287,6 +292,7 @@ async function commitMovement(
     catName: cat.name,
     subName: sub?.name ?? null,
     method: stated ? method : null,
+    entity: p.entity || null,
     reimbursedCents,
     description: p.description || null,
     on,
@@ -613,6 +619,7 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
           catName: row.categoryName,
           subName: row.subcategoryName,
           method: row.method,
+          entity: row.entity,
           reimbursedCents: null,
           description: row.description,
           on: String(row.receivedOn),
@@ -641,6 +648,7 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
           catName: row.categoryName,
           subName: row.subcategoryName,
           method: row.paymentMethod,
+          entity: row.entity,
           reimbursedCents: reimb || null,
           description: row.description,
           on: String(row.spentOn),

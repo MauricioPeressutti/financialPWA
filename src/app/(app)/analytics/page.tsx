@@ -314,6 +314,30 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
             </div>
           </Section>
 
+          {a.byEntity.length > 0 && (
+            <Section
+              title="Por banco / billetera"
+              hint={
+                a.entityCoveragePct < 95
+                  ? `${a.entityCoveragePct.toFixed(0)}% de los gastos tiene entidad`
+                  : undefined
+              }
+            >
+              <div className="divide-y">
+                {a.byEntity.map((e) => (
+                  <BarRow
+                    key={e.name}
+                    label={e.name}
+                    valueCents={e.grossCents}
+                    pct={e.pct}
+                    fmt={fm}
+                    meta={`${e.count}`}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
           {!memberId && a.byMember.length > 1 && (
             <Section title="Quién gastó más">
               <div className="space-y-3">

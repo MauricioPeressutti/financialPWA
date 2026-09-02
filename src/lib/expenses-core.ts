@@ -9,6 +9,7 @@ import {
   reimbursements,
   subcategories,
 } from "@/db/schema";
+import { normalizeEntity } from "@/lib/entities";
 import { parseAmountToCents } from "@/lib/money";
 import type { PaymentMethod } from "@/lib/payment-methods";
 import type { SplitMode } from "@/lib/effort";
@@ -20,6 +21,7 @@ export type NewExpense = {
   categoryId: string;
   subcategoryId?: string | null;
   paymentMethod: PaymentMethod;
+  entity?: string | null; // banco / billetera (texto libre)
   description?: string | null;
   spentOn: string; // YYYY-MM-DD
   reimbursedCents?: number | null; // en la misma moneda que el gasto
@@ -67,6 +69,7 @@ export async function insertExpense(
       categoryId: e.categoryId,
       subcategoryId: subId,
       paymentMethod: e.paymentMethod,
+      entity: normalizeEntity(e.entity),
       description: e.description || null,
       spentOn: e.spentOn,
       source: e.source === "telegram" ? "telegram" : "web",

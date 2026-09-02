@@ -1,14 +1,19 @@
 import { ExpenseForm } from "@/components/expense-form";
 import { requireTeam } from "@/lib/auth";
 import { getFxContext } from "@/lib/fx";
-import { getActiveCategories, getSplitMembers } from "@/lib/queries";
+import {
+  getActiveCategories,
+  getSplitMembers,
+  getUsedEntities,
+} from "@/lib/queries";
 
 export default async function NewExpensePage() {
   const { team } = await requireTeam();
-  const [categories, fx, members] = await Promise.all([
+  const [categories, fx, members, usedEntities] = await Promise.all([
     getActiveCategories(team.id, "expense"),
     getFxContext(team),
     getSplitMembers(team.id),
+    getUsedEntities(team.id),
   ]);
 
   return (
@@ -21,6 +26,7 @@ export default async function NewExpensePage() {
         usdArsRate={fx.usdArsRate}
         fxReferenceLabel={fx.fxReferenceLabel}
         effortEnabled={team.effortEnabled}
+        usedEntities={usedEntities}
         members={members.map((m) => ({
           userId: m.userId,
           name: m.name,

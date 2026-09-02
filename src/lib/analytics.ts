@@ -79,6 +79,7 @@ export async function getAnalytics(
     catRefRows,
     subRows,
     methodRows,
+    entityRows,
     memberRows,
     memberRefRows,
     memberCatRows,
@@ -156,6 +157,16 @@ export async function getAnalytics(
       .from(expenses)
       .where(inRange)
       .groupBy(expenses.paymentMethod)
+      .orderBy(desc(sql`sum(${expenses.amountCents})`)),
+    db
+      .select({
+        entity: expenses.entity,
+        gross: sql<number>`sum(${expenses.amountCents})`,
+        count: sql<number>`count(*)`,
+      })
+      .from(expenses)
+      .where(and(inRange, sql`${expenses.entity} is not null`))
+      .groupBy(expenses.entity)
       .orderBy(desc(sql`sum(${expenses.amountCents})`)),
     db
       .select({
@@ -333,6 +344,17 @@ export async function getAnalytics(
     pct: grossCents ? (n(r.gross) / grossCents) * 100 : 0,
   }));
 
+  const byEntity = entityRows.map((r) => ({
+    name: r.entity as string,
+    grossCents: n(r.gross),
+    count: n(r.count),
+    pct: grossCents ? (n(r.gross) / grossCents) * 100 : 0,
+  }));
+  const entityCoveragePct =
+    count > 0
+      ? (byEntity.reduce((s, e) => s + e.count, 0) / count) * 100
+      : 0;
+
   // ---- miembros ----
   const memberRefMap = new Map(memberRefRows.map((r) => [r.userId, n(r.refunded)]));
   const memberCatMap = new Map<string, { name: string; cents: number }[]>();
@@ -421,6 +443,8 @@ export async function getAnalytics(
     byCategory,
     bySubcategory,
     byPaymentMethod,
+    byEntity,
+    entityCoveragePct,
     byMember,
     byWeekday,
     days,

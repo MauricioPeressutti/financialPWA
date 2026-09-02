@@ -55,6 +55,7 @@ export default async function ExpenseDetailPage({
             v={`${expense.categoryName}${expense.subcategoryName ? ` · ${expense.subcategoryName}` : ""}`}
           />
           <Row k="Forma de pago" v={paymentMethodLabels[expense.paymentMethod]} />
+          {expense.entity && <Row k="Banco / billetera" v={expense.entity} />}
           {foreign && (
             <>
               <Row

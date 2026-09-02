@@ -1,13 +1,14 @@
 import { IncomeForm } from "@/components/income-form";
 import { requireTeam } from "@/lib/auth";
 import { getFxContext } from "@/lib/fx";
-import { getActiveCategories } from "@/lib/queries";
+import { getActiveCategories, getUsedEntities } from "@/lib/queries";
 
 export default async function NewIncomePage() {
   const { team } = await requireTeam();
-  const [categories, fx] = await Promise.all([
+  const [categories, fx, usedEntities] = await Promise.all([
     getActiveCategories(team.id, "income"),
     getFxContext(team),
+    getUsedEntities(team.id),
   ]);
 
   return (
@@ -19,6 +20,7 @@ export default async function NewIncomePage() {
         currencies={fx.currencies}
         usdArsRate={fx.usdArsRate}
         fxReferenceLabel={fx.fxReferenceLabel}
+        usedEntities={usedEntities}
       />
     </div>
   );

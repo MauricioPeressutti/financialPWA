@@ -10,6 +10,7 @@ import { AmountInput } from "@/components/ui/amount-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EntityField } from "@/components/entity-field";
 import { MoneyField } from "@/components/money-field";
 import { SplitFields, type SplitMember } from "@/components/split-fields";
 import {
@@ -42,6 +43,7 @@ type Props = {
   fxReferenceLabel: string;
   members: SplitMember[];
   effortEnabled: boolean;
+  usedEntities?: string[];
   expense?: {
     id: string;
     amount: string;
@@ -51,6 +53,7 @@ type Props = {
     categoryId: string;
     subcategoryId: string | null;
     paymentMethod: PaymentMethod;
+    entity: string | null;
     description: string | null;
     splitMode: string;
     paidByUserId: string | null;
@@ -65,6 +68,7 @@ export function ExpenseForm({
   fxReferenceLabel,
   members,
   effortEnabled,
+  usedEntities = [],
   expense,
 }: Props) {
   const router = useRouter();
@@ -82,6 +86,7 @@ export function ExpenseForm({
       categoryId: expense?.categoryId ?? "",
       subcategoryId: expense?.subcategoryId ?? "",
       paymentMethod: expense?.paymentMethod ?? "efectivo",
+      entity: expense?.entity ?? "",
       description: expense?.description ?? "",
       reimbursedAmount: "",
       splitMode:
@@ -225,6 +230,8 @@ export function ExpenseForm({
           )}
         />
       </div>
+
+      <EntityField register={form.register("entity")} used={usedEntities} />
 
       <div className="space-y-1.5">
         <Label htmlFor="description">Descripción (opcional)</Label>

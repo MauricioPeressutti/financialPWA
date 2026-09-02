@@ -263,6 +263,8 @@ export const expenses = pgTable(
       .references(() => categories.id),
     subcategoryId: uuid("subcategory_id").references(() => subcategories.id),
     paymentMethod: paymentMethod("payment_method").notNull(),
+    // Entidad bancaria / billetera (texto libre, null si no se especificó)
+    entity: text("entity"),
     description: text("description"),
     spentOn: date("spent_on").notNull(),
     // Cómo se cargó: "web" (formulario) | "telegram" (bot)
@@ -337,6 +339,8 @@ export const incomes = pgTable(
       .references(() => categories.id),
     subcategoryId: uuid("subcategory_id").references(() => subcategories.id),
     method: incomeMethod("method").notNull().default("transferencia"),
+    // Entidad bancaria / billetera (texto libre, null si no se especificó)
+    entity: text("entity"),
     description: text("description"),
     receivedOn: date("received_on").notNull(),
     // Cómo se cargó: "web" (formulario) | "telegram" (bot)
