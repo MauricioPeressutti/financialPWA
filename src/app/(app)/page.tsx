@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
+import { AddFab } from "@/components/add-fab";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireTeam } from "@/lib/auth";
@@ -306,16 +307,7 @@ export default async function DashboardPage({
         </div>
       </section>
 
-      <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-10 flex flex-col items-end gap-2">
-        <Button
-          className="h-11 rounded-full border-0 bg-emerald-600 px-5 text-white shadow-lg hover:bg-emerald-700"
-          render={<Link href="/incomes/new">+ Ingreso</Link>}
-        />
-        <Button
-          className="h-12 rounded-full px-5 shadow-lg"
-          render={<Link href="/expenses/new">+ Gasto</Link>}
-        />
-      </div>
+      <AddFab />
     </div>
   );
 }
