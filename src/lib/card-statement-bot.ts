@@ -52,9 +52,7 @@ export async function handleStatementPdf(args: HandleArgs): Promise<void> {
   if (dup) {
     await sendMessage(
       chatId,
-      `Este resumen ya lo tenías cargado (${label}).\n${appUrl(
-        `/tarjetas/${dup.id}/revisar`,
-      )}`,
+      `Este resumen ya lo tenías cargado (${label}).\n${appUrl("/tarjetas")}`,
     );
     return;
   }
@@ -94,17 +92,15 @@ export async function handleStatementPdf(args: HandleArgs): Promise<void> {
       ? `Mínimo: ${formatMoney(parsed.minPaymentArsCents, "ARS")}`
       : "",
     `${consumos} consumo${consumos === 1 ? "" : "s"} en el período`,
+    "",
+    "Te aviso unos días antes de que venza.",
   ].filter(Boolean);
 
   await sendMessage(chatId, lines.join("\n"), [
     [
-      {
-        text: "📥 Revisar y cargar consumos",
-        url: appUrl(`/tarjetas/${row.id}/revisar`),
-      },
+      { text: "💳 Ya la pagué", callback_data: `cardpaid:${row.id}` },
+      { text: "🗑️ Descartar", callback_data: `carddismiss:${row.id}` },
     ],
-    [{ text: "🔔 Solo recordarme el vencimiento", callback_data: `cardremind:${row.id}` }],
-    [{ text: "🗑️ Descartar", callback_data: `carddismiss:${row.id}` }],
   ]);
 }
 

@@ -151,7 +151,7 @@ export default async function DashboardPage({
 
       {upcomingCard && (
         <Link
-          href={`/tarjetas/${upcomingCard.id}/revisar`}
+          href="/tarjetas"
           className="block rounded-xl border border-amber-500/40 bg-amber-500/[0.07] px-4 py-3"
         >
           <div className="flex items-center justify-between gap-2">

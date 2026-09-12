@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
@@ -18,10 +17,10 @@ import { formatMoney } from "@/lib/money";
 type Row = Awaited<ReturnType<typeof listStatements>>[number];
 
 const STATUS: Record<string, { label: string; cls: string }> = {
-  pending: { label: "sin importar", cls: "text-cyan-500 border-cyan-500/40 bg-cyan-500/10" },
+  pending: { label: "pendiente", cls: "text-cyan-500 border-cyan-500/40 bg-cyan-500/10" },
   reminder_only: {
-    label: "solo aviso",
-    cls: "text-muted-foreground border-border",
+    label: "pendiente",
+    cls: "text-cyan-500 border-cyan-500/40 bg-cyan-500/10",
   },
   imported: {
     label: "consumos cargados",
@@ -109,12 +108,6 @@ export function StatementCard({ s }: { s: Row }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        {s.status !== "paid" && (
-          <Button
-            size="sm"
-            render={<Link href={`/tarjetas/${s.id}/revisar`}>📥 Revisar consumos</Link>}
-          />
-        )}
         {s.status !== "paid" ? (
           <Button
             size="sm"

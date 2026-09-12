@@ -23,8 +23,7 @@ export default async function TarjetasPage() {
           <p className="mt-2 text-sm text-muted-foreground">
             Todavía no cargaste ningún resumen. Abrí Telegram, buscá{" "}
             <b className="text-foreground">@Finan_app_bot</b> y mandale el PDF del
-            resumen de tu tarjeta. Te aviso cuándo vence y te dejo cargar los
-            consumos.
+            resumen de tu tarjeta. Te aviso unos días antes de que venza.
           </p>
         </div>
       ) : (
