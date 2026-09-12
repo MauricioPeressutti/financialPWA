@@ -1,9 +1,212 @@
 {
-  "id": "c8159dbb-eca2-4532-a863-a37627751fa6",
-  "prevId": "746bf3ec-9e15-41f8-ae5a-0f67d71d8cca",
+  "id": "231145d2-eab5-4995-986d-0300a60f803f",
+  "prevId": "51ce2c81-3d69-4d9b-bcd4-284be3e348cd",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.card_statements": {
+      "name": "card_statements",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bank": {
+          "name": "bank",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "brand": {
+          "name": "brand",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last4": {
+          "name": "last4",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "closing_date": {
+          "name": "closing_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_date": {
+          "name": "due_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total_ars_cents": {
+          "name": "total_ars_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "total_usd_cents": {
+          "name": "total_usd_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "min_payment_ars_cents": {
+          "name": "min_payment_ars_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "card_statement_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "raw": {
+          "name": "raw",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "import_log": {
+          "name": "import_log",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reminded_on": {
+          "name": "reminded_on",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "card_statements_team_due_idx": {
+          "name": "card_statements_team_due_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "due_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "card_statements_dedupe_idx": {
+          "name": "card_statements_dedupe_idx",
+          "columns": [
+            {
+              "expression": "team_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bank",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "last4",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "closing_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "card_statements_team_id_teams_id_fk": {
+          "name": "card_statements_team_id_teams_id_fk",
+          "tableFrom": "card_statements",
+          "tableTo": "teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "card_statements_created_by_user_id_users_id_fk": {
+          "name": "card_statements_created_by_user_id_users_id_fk",
+          "tableFrom": "card_statements",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.categories": {
       "name": "categories",
       "schema": "",
@@ -327,6 +530,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "entity": {
+          "name": "entity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "description": {
           "name": "description",
           "type": "text",
@@ -356,6 +565,12 @@
         },
         "paid_by_user_id": {
           "name": "paid_by_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "statement_id": {
+          "name": "statement_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -408,6 +623,21 @@
             },
             {
               "expression": "category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "expenses_statement_idx": {
+          "name": "expenses_statement_idx",
+          "columns": [
+            {
+              "expression": "statement_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -483,6 +713,19 @@
             "id"
           ],
           "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "expenses_statement_id_card_statements_id_fk": {
+          "name": "expenses_statement_id_card_statements_id_fk",
+          "tableFrom": "expenses",
+          "tableTo": "card_statements",
+          "columnsFrom": [
+            "statement_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -794,6 +1037,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'transferencia'"
+        },
+        "entity": {
+          "name": "entity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "description": {
           "name": "description",
@@ -1705,6 +1954,32 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.tg_processed_updates": {
+      "name": "tg_processed_updates",
+      "schema": "",
+      "columns": {
+        "update_id": {
+          "name": "update_id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.users": {
       "name": "users",
       "schema": "",
@@ -1766,6 +2041,17 @@
     }
   },
   "enums": {
+    "public.card_statement_status": {
+      "name": "card_statement_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "reminder_only",
+        "imported",
+        "paid",
+        "dismissed"
+      ]
+    },
     "public.category_kind": {
       "name": "category_kind",
       "schema": "public",

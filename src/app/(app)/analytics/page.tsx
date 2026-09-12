@@ -19,6 +19,7 @@ import {
   resolveRange,
   type AnalyticsRange as Range,
 } from "@/lib/analytics";
+import { parseCustomRange } from "@/lib/analytics-range";
 import { buildInsights } from "@/lib/analytics-insights";
 import { formatMoney } from "@/lib/money";
 import { IncomeMethodTag } from "@/lib/income-methods";
@@ -89,7 +90,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
     typeof sp.range === "string" && RANGES.includes(sp.range as Range)
       ? (sp.range as Range)
       : "3m";
-  const { from, to } = resolveRange(range);
+  const custom = parseCustomRange(sp);
+  const { from, to } = custom ?? resolveRange(range);
 
   const [members, teamCurrencies] = await Promise.all([
     getTeamMembers(team.id),
@@ -129,7 +131,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
 
       <div className="space-y-2">
         <CurrencyTabs currencies={currencies} value={cur} />
-        <AnalyticsRange value={range} />
+        <AnalyticsRange value={range} custom={custom} />
         {members.length > 1 && (
           <AnalyticsMember
             members={members.map((m) => ({
@@ -311,6 +313,30 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
               ))}
             </div>
           </Section>
+
+          {a.byEntity.length > 0 && (
+            <Section
+              title="Por banco / billetera"
+              hint={
+                a.entityCoveragePct < 95
+                  ? `${a.entityCoveragePct.toFixed(0)}% de los gastos tiene entidad`
+                  : undefined
+              }
+            >
+              <div className="divide-y">
+                {a.byEntity.map((e) => (
+                  <BarRow
+                    key={e.name}
+                    label={e.name}
+                    valueCents={e.grossCents}
+                    pct={e.pct}
+                    fmt={fm}
+                    meta={`${e.count}`}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
 
           {!memberId && a.byMember.length > 1 && (
             <Section title="Quién gastó más">

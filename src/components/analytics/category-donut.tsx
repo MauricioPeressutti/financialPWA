@@ -40,16 +40,16 @@ export function CategoryDonut({
     const sorted = [...slices].sort((a, b) => b.grossCents - a.grossCents);
     let head = sorted.slice(0, 6);
     if (sorted.length > 6) {
-      const tail = sorted.slice(5);
-      const rest = tail.reduce(
+      // el bucket de sobra: "Otras" para no chocar con una categoría real "Otros"
+      const rest = sorted.slice(5).reduce(
         (acc, s) => ({
-          name: "Otros",
+          ...acc,
           grossCents: acc.grossCents + s.grossCents,
           netCents: acc.netCents + s.netCents,
           count: acc.count + s.count,
           pct: acc.pct + s.pct,
         }),
-        { name: "Otros", grossCents: 0, netCents: 0, count: 0, pct: 0 },
+        { name: "Otras", grossCents: 0, netCents: 0, count: 0, pct: 0 },
       );
       head = [...sorted.slice(0, 5), rest];
     }
@@ -77,9 +77,9 @@ export function CategoryDonut({
           className={`relative size-[148px] shrink-0 ${shown ? "[&_.seg]:opacity-30" : ""}`}
         >
           <svg viewBox="0 0 100 100" className="size-full -rotate-90">
-            {arcs.map(({ s, frac, offset }) => (
+            {arcs.map(({ s, frac, offset }, i) => (
               <circle
-                key={s.name}
+                key={`${s.name}-${i}`}
                 className="seg cursor-pointer transition-[opacity,stroke-width] duration-200"
                 cx="50"
                 cy="50"
@@ -119,8 +119,8 @@ export function CategoryDonut({
         </div>
 
         <ul className="flex min-w-0 flex-1 flex-col gap-1.5">
-          {data.map((s) => (
-            <li key={s.name}>
+          {data.map((s, i) => (
+            <li key={`${s.name}-${i}`}>
               <button
                 className="flex w-full items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted aria-pressed:bg-muted"
                 aria-pressed={shown === s.name}
@@ -161,9 +161,9 @@ export function CategoryDonut({
               </tr>
             </thead>
             <tbody>
-              {data.map((s) => (
+              {data.map((s, i) => (
                 <tr
-                  key={s.name}
+                  key={`${s.name}-${i}`}
                   className="[&_td]:border-b [&_td]:border-border/60 [&_td]:py-1.5 [&_td]:text-right [&_td:first-child]:text-left"
                 >
                   <td>{s.name}</td>

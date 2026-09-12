@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { EntityField } from "@/components/entity-field";
 import { MoneyField } from "@/components/money-field";
 import {
   Select,
@@ -38,6 +39,7 @@ type Props = {
   currencies: string[];
   usdArsRate: number | null;
   fxReferenceLabel: string;
+  usedEntities?: string[];
   income?: {
     id: string;
     amount: string;
@@ -47,6 +49,7 @@ type Props = {
     categoryId: string;
     subcategoryId: string | null;
     method: IncomeMethod;
+    entity: string | null;
     description: string | null;
   };
 };
@@ -57,6 +60,7 @@ export function IncomeForm({
   currencies,
   usdArsRate,
   fxReferenceLabel,
+  usedEntities = [],
   income,
 }: Props) {
   const router = useRouter();
@@ -74,6 +78,7 @@ export function IncomeForm({
       categoryId: income?.categoryId ?? "",
       subcategoryId: income?.subcategoryId ?? "",
       method: income?.method ?? "transferencia",
+      entity: income?.entity ?? "",
       description: income?.description ?? "",
     },
   });
@@ -212,6 +217,8 @@ export function IncomeForm({
           )}
         />
       </div>
+
+      <EntityField register={form.register("entity")} used={usedEntities} />
 
       <div className="space-y-1.5">
         <Label htmlFor="description">Descripción (opcional)</Label>

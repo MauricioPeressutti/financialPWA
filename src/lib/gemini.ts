@@ -4,7 +4,10 @@ import { PAYMENT_METHODS, paymentMethodMeta } from "@/lib/payment-methods";
 import { INCOME_METHODS, incomeMethodMeta } from "@/lib/income-methods";
 
 // Se puede sobreescribir con la env var GEMINI_MODEL sin tocar el código.
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+// flash-lite tiene ~1.000 requests/día y 15/min en el tier gratuito (vs ~250/día
+// de flash) y su cuota diaria es INDEPENDIENTE de la de flash. Para parsear
+// "gasté 2500 en gas" alcanza y sobra, y aguanta mejor los picos de demanda.
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -41,6 +44,7 @@ export type ParsedMovement = {
   category: string;
   subcategory: string;
   paymentMethod: string; // gasto: forma de pago · ingreso: medio
+  entity: string; // banco / billetera, "" si no se menciona
   description: string;
   reimbursed: number; // solo gasto
   spentOn: string; // fecha del movimiento (YYYY-MM-DD)
@@ -112,6 +116,17 @@ function buildSystemPrompt(opts: ParseOpts, receipt: boolean): string {
     '  "mp"/"mercado pago"=mercadopago.',
     'IMPORTANTE: si el mensaje NO aclara la forma de pago / medio, devolvé paymentMethod = "". No lo adivines.',
     "",
+    "entity = el banco o la billetera con la que se hizo el movimiento, si se menciona.",
+    '  Bancos: "Banco Nación", "Galicia", "Santander", "BBVA", "Banco Macro", "ICBC",',
+    '  "Banco Ciudad", "Banco Provincia", "Credicoop", "Supervielle", "Banco Patagonia",',
+    '  "Comafi", "HSBC", "Banco Hipotecario", etc.',
+    '  Billeteras: "Mercado Pago", "MODO", "Ualá", "Brubank", "Naranja X", "Personal Pay",',
+    '  "Cuenta DNI", "Prex", "Belo", "Lemon", "Fiwind", "Reba", "N1U", "Astropay".',
+    '  Ejemplos: "pagué con la del Galicia" -> "Galicia"; "transferí desde Brubank" -> "Brubank";',
+    '  "con mercado pago" -> "Mercado Pago"; "con modo" -> "MODO".',
+    '  Si NO se menciona ningún banco/billetera, entity = "". NO lo adivines a partir de la',
+    '  forma de pago (ej: "con débito" NO implica ningún banco puntual).',
+    "",
     "Moneda (currency): ARS por defecto. USD si dice \"usd\", \"u$s\", \"dólares\", \"dolares\",",
     '  "verdes", "green". EUR si dice "euros"/"eur". El número va sin la moneda.',
     "",
@@ -139,6 +154,9 @@ function buildSystemPrompt(opts: ParseOpts, receipt: boolean): string {
       "- description = el nombre del comercio/local.",
       "- paymentMethod: si el comprobante muestra el medio (VISA/MASTERCARD/tarjeta, DÉBITO,",
       "  CRÉDITO, MODO, MERCADO PAGO/MERCADOPAGO, EFECTIVO), usalo. Si no se ve, dejá \"\".",
+      "- entity: el comprobante casi siempre trae el banco o billetera emisor (arriba, en el",
+      "  logo, o en 'Banco XXX', 'desde tu cuenta de Mercado Pago', etc.). Ponelo en entity",
+      "  con el nombre normalizado. Si no se ve, entity = \"\".",
       "- currency: si dice USD/U$S/dólares -> USD; si no, ARS.",
       "- Si la imagen NO es un comprobante o no podés leer el monto, amount = null.",
       "- confidence: \"alta\" solo si el total se lee nítido.",
@@ -218,6 +236,7 @@ const MOVEMENT_SCHEMA = {
     category: { type: "string" },
     subcategory: { type: "string" },
     paymentMethod: { type: "string" },
+    entity: { type: "string" },
     description: { type: "string" },
     reimbursed: { type: "number" },
     spentOn: { type: "string" },
@@ -258,6 +277,7 @@ async function callGemini(
     category: p.category ?? "",
     subcategory: p.subcategory ?? "",
     paymentMethod: p.paymentMethod ?? "",
+    entity: p.entity ?? "",
     description: p.description ?? "",
     reimbursed: typeof p.reimbursed === "number" ? p.reimbursed : 0,
     spentOn: p.spentOn ?? today,

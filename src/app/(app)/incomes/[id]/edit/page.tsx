@@ -4,7 +4,7 @@ import { IncomeForm } from "@/components/income-form";
 import { requireTeam } from "@/lib/auth";
 import { getFxContext } from "@/lib/fx";
 import { centsToAmountInput } from "@/lib/money";
-import { getActiveCategories, getIncome } from "@/lib/queries";
+import { getActiveCategories, getIncome, getUsedEntities } from "@/lib/queries";
 
 export default async function EditIncomePage({
   params,
@@ -12,10 +12,11 @@ export default async function EditIncomePage({
   const { team } = await requireTeam();
   const { id } = await params;
 
-  const [income, categories, fx] = await Promise.all([
+  const [income, categories, fx, usedEntities] = await Promise.all([
     getIncome(team.id, id),
     getActiveCategories(team.id, "income"),
     getFxContext(team),
+    getUsedEntities(team.id),
   ]);
   if (!income) notFound();
 
@@ -28,6 +29,7 @@ export default async function EditIncomePage({
         currencies={fx.currencies}
         usdArsRate={fx.usdArsRate}
         fxReferenceLabel={fx.fxReferenceLabel}
+        usedEntities={usedEntities}
         income={{
           id: income.id,
           amount: centsToAmountInput(income.amountCents),
@@ -37,6 +39,7 @@ export default async function EditIncomePage({
           categoryId: income.categoryId,
           subcategoryId: income.subcategoryId,
           method: income.method,
+          entity: income.entity,
           description: income.description,
         }}
       />

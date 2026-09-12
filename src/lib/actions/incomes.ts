@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { incomes } from "@/db/schema";
 import { requireTeam } from "@/lib/auth";
+import { normalizeEntity } from "@/lib/entities";
 import { insertIncome } from "@/lib/income-core";
 import { fxForMovement } from "@/lib/fx";
 import { parseAmountToCents } from "@/lib/money";
@@ -37,6 +38,7 @@ export async function createIncome(raw: unknown): Promise<ActionResult> {
     categoryId: parsed.data.categoryId,
     subcategoryId: parsed.data.subcategoryId || null,
     method: parsed.data.method,
+    entity: parsed.data.entity || null,
     description: parsed.data.description || null,
     receivedOn: parsed.data.receivedOn,
   });
@@ -66,6 +68,7 @@ export async function updateIncome(id: string, raw: unknown): Promise<ActionResu
       categoryId: parsed.data.categoryId,
       subcategoryId: parsed.data.subcategoryId || null,
       method: parsed.data.method,
+      entity: normalizeEntity(parsed.data.entity),
       description: parsed.data.description || null,
       receivedOn: parsed.data.receivedOn,
       updatedAt: new Date(),

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { expenseSplits, expenses, reimbursements, teamMembers } from "@/db/schema";
 import { requireTeam } from "@/lib/auth";
 import { splitShares, type SplitMode } from "@/lib/effort";
+import { normalizeEntity } from "@/lib/entities";
 import { insertExpense } from "@/lib/expenses-core";
 import { fxForMovement } from "@/lib/fx";
 import { parseAmountToCents } from "@/lib/money";
@@ -95,6 +96,7 @@ export async function createExpense(raw: unknown): Promise<ActionResult> {
     categoryId: parsed.data.categoryId,
     subcategoryId: parsed.data.subcategoryId || null,
     paymentMethod: parsed.data.paymentMethod,
+    entity: parsed.data.entity || null,
     description: parsed.data.description || null,
     spentOn: parsed.data.spentOn,
     reimbursedCents: refundCents,
@@ -137,6 +139,7 @@ export async function updateExpense(id: string, raw: unknown): Promise<ActionRes
       categoryId: parsed.data.categoryId,
       subcategoryId: parsed.data.subcategoryId || null,
       paymentMethod: parsed.data.paymentMethod,
+      entity: normalizeEntity(parsed.data.entity),
       description: parsed.data.description || null,
       spentOn: parsed.data.spentOn,
       splitMode: parsed.data.splitMode,

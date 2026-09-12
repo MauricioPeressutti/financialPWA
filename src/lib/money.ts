@@ -61,11 +61,16 @@ export function parseAmountToCents(input: string): number | null {
  * Formatea progresivamente lo que se tipea en un input de monto, es-AR:
  * "1000000" -> "1.000.000" · "2500,5" -> "2.500,5" · "1234.56" -> "1.234,56"
  * Idempotente (re-formatear su propia salida da lo mismo).
+ *
+ * `isDelete` (borrado, no inserción/pegado) desactiva la heurística de
+ * "un solo punto con 1-2 dígitos detrás = decimal": si no, borrar el último
+ * dígito de "15.000" deja "15.00", que esa heurística confunde con "15,00"
+ * (quince con 00 centavos) en vez del "1.500" que se espera.
  */
-export function formatAmountInput(raw: string): string {
+export function formatAmountInput(raw: string, isDelete = false): string {
   let s = raw.replace(/[^\d.,]/g, "");
   // un "." como decimal solo si es el único separador con 1-2 dígitos detrás
-  s = s.replace(/^(\d+)\.(\d{1,2})$/, "$1,$2");
+  if (!isDelete) s = s.replace(/^(\d+)\.(\d{1,2})$/, "$1,$2");
   s = s.replace(/\./g, ""); // el resto de puntos = miles, se recalculan
   const firstComma = s.indexOf(",");
   if (firstComma !== -1) {

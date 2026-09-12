@@ -1,6 +1,6 @@
 /**
- * Aplica drizzle/0012_bright_barracuda.sql (expenses.source + incomes.source).
- *   node scripts/apply-0012.mjs
+ * Aplica drizzle/0013_square_alice.sql (tabla tg_processed_updates, dedupe de webhooks).
+ *   node scripts/apply-0013.mjs
  */
 import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
@@ -15,7 +15,7 @@ for (const line of raw.split(/\r?\n/)) {
 
 const sql = neon(process.env.DATABASE_URL);
 const migration = readFileSync(
-  new URL("../drizzle/0012_bright_barracuda.sql", import.meta.url),
+  new URL("../drizzle/0013_square_alice.sql", import.meta.url),
   "utf8",
 );
 
@@ -28,8 +28,8 @@ for (const stmt of migration
     console.log("OK  ", stmt.replace(/\s+/g, " ").slice(0, 70));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (/already exists|duplicate column/i.test(msg)) {
-      console.log("skip (ya existe):", stmt.slice(0, 60));
+    if (/already exists/i.test(msg)) {
+      console.log("skip (ya existe)");
     } else {
       console.error("ERR:", msg);
       process.exit(1);
@@ -37,8 +37,5 @@ for (const stmt of migration
   }
 }
 
-const cols = await sql`
-  select table_name, column_name from information_schema.columns
-  where column_name = 'source' and table_name in ('expenses','incomes')
-`;
-console.log("\ncolumnas source:", cols);
+const [c] = await sql`select count(*)::int n from tg_processed_updates`;
+console.log("\ntg_processed_updates OK, filas:", c.n);

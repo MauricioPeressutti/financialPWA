@@ -15,6 +15,7 @@ export const expenseInput = z.object({
   categoryId: z.string().uuid("Elegí una categoría"),
   subcategoryId: z.string().uuid().optional().or(z.literal("")),
   paymentMethod: z.enum(PAYMENT_METHODS),
+  entity: z.string().max(40).optional().or(z.literal("")),
   description: z.string().max(280).optional().or(z.literal("")),
   // Reintegro inmediato opcional (ej: MODO devuelve al toque). Se anota
   // como reintegro del mismo gasto, con la fecha del gasto.
@@ -41,6 +42,7 @@ export const incomeInput = z.object({
   categoryId: z.string().uuid("Elegí una fuente"),
   subcategoryId: z.string().uuid().optional().or(z.literal("")),
   method: z.enum(INCOME_METHODS),
+  entity: z.string().max(40).optional().or(z.literal("")),
   description: z.string().max(280).optional().or(z.literal("")),
 });
 export type IncomeInput = z.infer<typeof incomeInput>;

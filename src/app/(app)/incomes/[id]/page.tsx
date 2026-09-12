@@ -46,6 +46,7 @@ export default async function IncomeDetailPage({
             v={`${income.categoryName}${income.subcategoryName ? ` · ${income.subcategoryName}` : ""}`}
           />
           <Row k="Medio" v={incomeMethodLabels[income.method] ?? income.method} />
+          {income.entity && <Row k="Banco / billetera" v={income.entity} />}
           {foreign && (
             <>
               <Row

@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { incomes, subcategories } from "@/db/schema";
+import { normalizeEntity } from "@/lib/entities";
 import type { IncomeMethod } from "@/lib/income-methods";
 
 export type NewIncome = {
@@ -13,8 +14,10 @@ export type NewIncome = {
   categoryId: string;
   subcategoryId?: string | null;
   method: IncomeMethod;
+  entity?: string | null; // banco / billetera (texto libre)
   description?: string | null;
   receivedOn: string; // YYYY-MM-DD
+  source?: string; // "web" (default) | "telegram"
 };
 
 /**
@@ -51,8 +54,10 @@ export async function insertIncome(
       categoryId: e.categoryId,
       subcategoryId: subId,
       method: e.method,
+      entity: normalizeEntity(e.entity),
       description: e.description || null,
       receivedOn: e.receivedOn,
+      source: e.source === "telegram" ? "telegram" : "web",
     })
     .returning({ id: incomes.id });
 

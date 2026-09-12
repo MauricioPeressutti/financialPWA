@@ -1,6 +1,6 @@
 {
-  "id": "c8159dbb-eca2-4532-a863-a37627751fa6",
-  "prevId": "746bf3ec-9e15-41f8-ae5a-0f67d71d8cca",
+  "id": "51ce2c81-3d69-4d9b-bcd4-284be3e348cd",
+  "prevId": "37418ffd-079a-4054-aa19-3f8e5497d466",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -326,6 +326,12 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
+        },
+        "entity": {
+          "name": "entity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "description": {
           "name": "description",
@@ -794,6 +800,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'transferencia'"
+        },
+        "entity": {
+          "name": "entity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "description": {
           "name": "description",
@@ -1701,6 +1713,32 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tg_processed_updates": {
+      "name": "tg_processed_updates",
+      "schema": "",
+      "columns": {
+        "update_id": {
+          "name": "update_id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

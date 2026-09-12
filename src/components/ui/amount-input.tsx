@@ -23,7 +23,9 @@ export function AmountInput({
       {...props}
       onChange={(e) => {
         const el = e.currentTarget;
-        const formatted = formatAmountInput(el.value);
+        const inputType = (e.nativeEvent as InputEvent).inputType ?? "";
+        const isDelete = inputType.startsWith("delete");
+        const formatted = formatAmountInput(el.value, isDelete);
         if (formatted !== el.value) el.value = formatted;
         onChange?.(e);
       }}

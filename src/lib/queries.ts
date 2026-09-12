@@ -32,6 +32,28 @@ export function currentMonth(): string {
   return new Date().toISOString().slice(0, 7);
 }
 
+/** Entidades (banco / billetera) ya usadas por el equipo — para el autocompletado. */
+export async function getUsedEntities(teamId: string): Promise<string[]> {
+  const rows = await db
+    .select({ entity: expenses.entity })
+    .from(expenses)
+    .where(and(eq(expenses.teamId, teamId), sql`${expenses.entity} is not null`))
+    .groupBy(expenses.entity)
+    .union(
+      db
+        .select({ entity: incomes.entity })
+        .from(incomes)
+        .where(
+          and(eq(incomes.teamId, teamId), sql`${incomes.entity} is not null`),
+        )
+        .groupBy(incomes.entity),
+    );
+  return rows
+    .map((r) => r.entity as string)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, "es"));
+}
+
 export async function getActiveCategories(
   teamId: string,
   kind: CategoryKind = "expense",
@@ -133,6 +155,7 @@ export async function listExpenses(teamId: string, filters: ExpenseFilters = {})
       fxRate: expenses.fxRate,
       baseAmountCents: expenses.baseAmountCents,
       paymentMethod: expenses.paymentMethod,
+      entity: expenses.entity,
       description: expenses.description,
       spentOn: expenses.spentOn,
       createdAt: expenses.createdAt,
@@ -159,6 +182,7 @@ export async function getExpense(teamId: string, id: string) {
       fxRate: expenses.fxRate,
       baseAmountCents: expenses.baseAmountCents,
       paymentMethod: expenses.paymentMethod,
+      entity: expenses.entity,
       description: expenses.description,
       spentOn: expenses.spentOn,
       createdAt: expenses.createdAt,
@@ -218,6 +242,7 @@ export async function listIncomes(teamId: string, filters: IncomeFilters = {}) {
       fxRate: incomes.fxRate,
       baseAmountCents: incomes.baseAmountCents,
       method: incomes.method,
+      entity: incomes.entity,
       description: incomes.description,
       receivedOn: incomes.receivedOn,
       createdAt: incomes.createdAt,
@@ -242,6 +267,7 @@ export async function getIncome(teamId: string, id: string) {
       fxRate: incomes.fxRate,
       baseAmountCents: incomes.baseAmountCents,
       method: incomes.method,
+      entity: incomes.entity,
       description: incomes.description,
       receivedOn: incomes.receivedOn,
       createdAt: incomes.createdAt,

@@ -1,6 +1,6 @@
 /**
- * Aplica drizzle/0012_bright_barracuda.sql (expenses.source + incomes.source).
- *   node scripts/apply-0012.mjs
+ * Aplica drizzle/0014_early_rattler.sql (expenses.entity + incomes.entity).
+ *   node scripts/apply-0014.mjs
  */
 import { readFileSync } from "node:fs";
 import { neon } from "@neondatabase/serverless";
@@ -15,7 +15,7 @@ for (const line of raw.split(/\r?\n/)) {
 
 const sql = neon(process.env.DATABASE_URL);
 const migration = readFileSync(
-  new URL("../drizzle/0012_bright_barracuda.sql", import.meta.url),
+  new URL("../drizzle/0014_early_rattler.sql", import.meta.url),
   "utf8",
 );
 
@@ -29,7 +29,7 @@ for (const stmt of migration
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (/already exists|duplicate column/i.test(msg)) {
-      console.log("skip (ya existe):", stmt.slice(0, 60));
+      console.log("skip (ya existe)");
     } else {
       console.error("ERR:", msg);
       process.exit(1);
@@ -39,6 +39,6 @@ for (const stmt of migration
 
 const cols = await sql`
   select table_name, column_name from information_schema.columns
-  where column_name = 'source' and table_name in ('expenses','incomes')
+  where column_name = 'entity' and table_name in ('expenses','incomes')
 `;
-console.log("\ncolumnas source:", cols);
+console.log("\ncolumnas entity:", cols);

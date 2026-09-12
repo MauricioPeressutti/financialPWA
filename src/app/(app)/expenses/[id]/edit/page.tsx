@@ -4,7 +4,12 @@ import { ExpenseForm } from "@/components/expense-form";
 import { requireTeam } from "@/lib/auth";
 import { getFxContext } from "@/lib/fx";
 import { centsToAmountInput } from "@/lib/money";
-import { getActiveCategories, getExpense, getSplitMembers } from "@/lib/queries";
+import {
+  getActiveCategories,
+  getExpense,
+  getSplitMembers,
+  getUsedEntities,
+} from "@/lib/queries";
 
 export default async function EditExpensePage({
   params,
@@ -12,11 +17,12 @@ export default async function EditExpensePage({
   const { team } = await requireTeam();
   const { id } = await params;
 
-  const [expense, categories, fx, members] = await Promise.all([
+  const [expense, categories, fx, members, usedEntities] = await Promise.all([
     getExpense(team.id, id),
     getActiveCategories(team.id, "expense"),
     getFxContext(team),
     getSplitMembers(team.id),
+    getUsedEntities(team.id),
   ]);
   if (!expense) notFound();
 
@@ -30,6 +36,7 @@ export default async function EditExpensePage({
         usdArsRate={fx.usdArsRate}
         fxReferenceLabel={fx.fxReferenceLabel}
         effortEnabled={team.effortEnabled}
+        usedEntities={usedEntities}
         members={members.map((m) => ({
           userId: m.userId,
           name: m.name,
@@ -44,6 +51,7 @@ export default async function EditExpensePage({
           categoryId: expense.categoryId,
           subcategoryId: expense.subcategoryId,
           paymentMethod: expense.paymentMethod,
+          entity: expense.entity,
           description: expense.description,
           splitMode: expense.splitMode,
           paidByUserId: expense.paidByUserId,
