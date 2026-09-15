@@ -22,21 +22,7 @@ export {
 const n = (v: unknown) => Number(v ?? 0);
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
-/** Índice de color (0-5) estable para una categoría, según su posición
- *  alfabética dentro de la lista completa. "Otros" siempre cae en el 5. */
-export function buildCategoryColors(allNames: string[]): Record<string, number> {
-  const sorted = [...allNames].sort((a, b) => a.localeCompare(b, "es"));
-  const map: Record<string, number> = {};
-  let i = 0;
-  for (const name of sorted) {
-    if (/^otros$/i.test(name)) map[name] = 5;
-    else {
-      map[name] = i % 5; // 0..4 para las "normales"
-      i++;
-    }
-  }
-  return map;
-}
+export { buildCategoryColors, catColorVar } from "@/lib/category-colors";
 
 // ─────────────────────────────────────────────────────────
 export async function getAnalytics(

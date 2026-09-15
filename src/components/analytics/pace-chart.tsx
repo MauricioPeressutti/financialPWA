@@ -24,7 +24,14 @@ export function PaceChart({
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block h-[120px] w-full">
-        <path d={path(pace.prevCum)} fill="none" stroke="var(--muted-foreground)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" opacity="0.7" />
+        {pace.curCum.length > 0 && (
+          <path
+            d={`${path(pace.curCum)} L ${px(pace.curCum.length - 1).toFixed(1)} ${(H - P).toFixed(1)} L ${px(0).toFixed(1)} ${(H - P).toFixed(1)} Z`}
+            fill="var(--primary)"
+            opacity="0.12"
+          />
+        )}
+        <path d={path(pace.prevCum)} fill="none" stroke="var(--muted-foreground)" strokeWidth="1.6" strokeDasharray="4 3" strokeLinejoin="round" strokeLinecap="round" opacity="0.8" />
         <path d={path(pace.curCum)} fill="none" stroke="var(--primary)" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
         {pace.curCum.length > 0 && (
           <circle cx={px(pace.curCum.length - 1)} cy={py(pace.curTotalCents)} r="3.4" fill="var(--primary)" />
@@ -35,7 +42,7 @@ export function PaceChart({
           <i className="block h-[3px] w-3.5 rounded-full bg-primary" /> Este mes
         </span>
         <span className="flex items-center gap-1.5">
-          <i className="block h-[3px] w-3.5 rounded-full bg-muted-foreground/70" /> {pace.prevMonthLabel}
+          <i className="block h-0 w-3.5 border-t-2 border-dashed border-muted-foreground/80" /> {pace.prevMonthLabel}
         </span>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">

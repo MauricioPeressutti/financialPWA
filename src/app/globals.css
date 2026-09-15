@@ -91,13 +91,20 @@
   --chart-4: #23b5a0;
   --chart-5: #7c8bab;
 
-  /* Paleta categórica para análisis — validada (CVD-safe), columna clara */
+  /* Paleta categórica para análisis — validada (CVD-safe), columna clara.
+     10 tonos rotativos (0-9) + "Otros" con gris dedicado, no rotativo,
+     para que el cajón de sastre no compita con las categorías reales. */
   --cat-0: #2a78d6;
   --cat-1: #eb6834;
   --cat-2: #1baf7a;
   --cat-3: #eda100;
   --cat-4: #e87ba4;
   --cat-5: #4a3aa7;
+  --cat-6: #6f9c1f;
+  --cat-7: #1c7fa0;
+  --cat-8: #9c389a;
+  --cat-9: #a8402c;
+  --cat-otros: #6b7494;
 
   /* Rampa secuencial (mapa de calor de gasto diario) */
   --heat-0: rgba(91, 192, 190, 0.12);
@@ -181,6 +188,11 @@
   --cat-3: #c98500;
   --cat-4: #d55181;
   --cat-5: #9085e9;
+  --cat-6: #a3d454;
+  --cat-7: #4fc2d4;
+  --cat-8: #cf5fc0;
+  --cat-9: #d9705a;
+  --cat-otros: #8892b0;
 
   --heat-0: rgba(91, 192, 190, 0.08);
   --heat-1: rgba(91, 192, 190, 0.24);

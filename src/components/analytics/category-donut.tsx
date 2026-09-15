@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { catColorVar } from "@/lib/category-colors";
 import { currencyMeta, type Currency } from "@/lib/currencies";
 import { formatMoney } from "@/lib/money";
 
@@ -12,8 +13,6 @@ type Slice = {
   count: number;
   pct: number;
 };
-
-const catVar = (i: number) => `var(--cat-${((i % 6) + 6) % 6})`;
 
 export function CategoryDonut({
   slices,
@@ -86,7 +85,7 @@ export function CategoryDonut({
                 r={R}
                 fill="none"
                 strokeWidth={shown === s.name ? 18 : 15}
-                stroke={catVar(colors[s.name] ?? 5)}
+                stroke={catColorVar(colors[s.name] ?? -1)}
                 strokeDasharray={`${(frac * C).toFixed(2)} ${(C - frac * C).toFixed(2)}`}
                 strokeDashoffset={(-offset * C).toFixed(2)}
                 style={{ opacity: shown === s.name ? 1 : undefined }}
@@ -130,7 +129,7 @@ export function CategoryDonut({
               >
                 <span
                   className="size-2.5 shrink-0 rounded-[3px]"
-                  style={{ background: catVar(colors[s.name] ?? 5) }}
+                  style={{ background: catColorVar(colors[s.name] ?? -1) }}
                 />
                 <span className="min-w-0 flex-1 truncate text-sm">{s.name}</span>
                 <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">

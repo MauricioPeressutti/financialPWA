@@ -11,7 +11,6 @@ import { TrendDual } from "@/components/analytics/trend-dual";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireTeam } from "@/lib/auth";
 import {
-  buildCategoryColors,
   getAnalytics,
   getDailySpend,
   getMonthlyTrend,
@@ -19,6 +18,7 @@ import {
   resolveRange,
   type AnalyticsRange as Range,
 } from "@/lib/analytics";
+import { buildCategoryColors, catColorVar } from "@/lib/category-colors";
 import { parseCustomRange } from "@/lib/analytics-range";
 import { buildInsights } from "@/lib/analytics-insights";
 import { getAiAdvice, type AdviceItem } from "@/lib/ai-advice";
@@ -43,14 +43,19 @@ function Kpi({
   value,
   sub,
   tone,
+  note,
+  wide,
 }: {
   label: string;
   value: string;
   sub?: string;
   tone?: "pos" | "neg";
+  /** Aviso corto para un valor atípico (ej. un % distorsionado por el rango). */
+  note?: string;
+  wide?: boolean;
 }) {
   return (
-    <div className="rounded-xl border bg-card/40 p-3">
+    <div className={`rounded-xl border bg-card/40 p-3 ${wide ? "col-span-2" : ""}`}>
       <p className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{label}</p>
       <p
         className={`mt-0.5 text-[1.02rem] font-semibold tabular-nums ${
@@ -60,6 +65,22 @@ function Kpi({
         {value}
       </p>
       {sub ? <p className="text-[0.66rem] text-muted-foreground tabular-nums">{sub}</p> : null}
+      {note ? (
+        <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[0.6rem] font-medium text-amber-600 dark:text-amber-400">
+          ⚠ {note}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function KpiGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[0.6rem] font-semibold uppercase tracking-wide text-muted-foreground/80">
+        {label}
+      </p>
+      <div className="grid grid-cols-2 gap-2">{children}</div>
     </div>
   );
 }
@@ -84,11 +105,11 @@ function Section({
   );
 }
 
-const ADVICE_STYLES: Record<AdviceItem["kind"], string> = {
-  alerta: "border-destructive/30 bg-destructive/5",
-  ahorro: "border-amber-500/30 bg-amber-500/5",
-  no_recurrente: "border-sky-500/30 bg-sky-500/5",
-  positivo: "border-emerald-500/30 bg-emerald-500/5",
+const ADVICE_META: Record<AdviceItem["kind"], { label: string; color: string }> = {
+  alerta: { label: "Alerta", color: "var(--destructive)" },
+  ahorro: { label: "Ahorro", color: "#f59e0b" },
+  no_recurrente: { label: "No recurrente", color: "#38bdf8" },
+  positivo: { label: "Positivo", color: "#10b981" },
 };
 
 export default async function AnalyticsPage({ searchParams }: PageProps<"/analytics">) {
@@ -179,47 +200,62 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
             </CardContent>
           </Card>
 
-          {/* KPIs */}
-          <div className="grid grid-cols-2 gap-2">
-            <Kpi
-              label="Gastado"
-              value={fm(k.netCents)}
-              sub={k.reimbursedCents ? `de ${fm(k.grossCents)} bruto` : undefined}
-            />
-            <Kpi label="Ingresos" value={fm(k.incomeCents)} sub={`${k.incomeCount} mov.`} tone="pos" />
-            <Kpi label="Prom. por día" value={fm(k.avgPerDayCents)} sub={`${k.spanDays} días`} />
-            <Kpi
-              label={`Proyección de ${pace.monthLabel}`}
-              value={fm(pace.projectionCents)}
-              sub={`hoy vas ${fm(pace.curTotalCents)}`}
-            />
-            <Kpi
-              label={`Ritmo vs ${pace.prevMonthLabel}`}
-              value={`${pace.vsPrevPct >= 0 ? "+" : ""}${pace.vsPrevPct.toFixed(0)}%`}
-              sub="a igual día del mes"
-              tone={Math.abs(pace.vsPrevPct) < 1 ? undefined : pace.vsPrevPct > 0 ? "neg" : "pos"}
-            />
-            <Kpi label="Ticket promedio" value={fm(k.avgTicketCents)} sub={`${k.count} gastos`} />
-            <Kpi label="Gasto más grande" value={fm(k.maxExpenseCents)} />
-            <Kpi
-              label="Día más caro"
-              value={k.maxDayCents ? fm(k.maxDayCents) : "—"}
-              sub={
-                k.maxDayDate
-                  ? new Date(k.maxDayDate + "T00:00:00").toLocaleDateString("es-AR", {
-                      day: "numeric",
-                      month: "short",
-                    })
-                  : undefined
-              }
-            />
-            <Kpi label="Días sin gastar" value={String(k.daysNoSpend)} sub={`de ${k.spanDays}`} />
-            <Kpi
-              label="Recupero"
-              value={`${k.refundRatePct.toFixed(0)}%`}
-              sub={k.reimbursedCents ? fm(k.reimbursedCents) : "sin reintegros"}
-              tone={k.reimbursedCents ? "pos" : undefined}
-            />
+          {/* KPIs — agrupados por tema para que no todo pese lo mismo */}
+          <div className="space-y-4">
+            <KpiGroup label="Balance">
+              <Kpi
+                label="Gastado"
+                value={fm(k.netCents)}
+                sub={k.reimbursedCents ? `de ${fm(k.grossCents)} bruto` : undefined}
+              />
+              <Kpi label="Ingresos" value={fm(k.incomeCents)} sub={`${k.incomeCount} mov.`} tone="pos" />
+            </KpiGroup>
+
+            <KpiGroup label="Ritmo">
+              <Kpi label="Prom. por día" value={fm(k.avgPerDayCents)} sub={`${k.spanDays} días`} />
+              <Kpi
+                label={`Proyección de ${pace.monthLabel}`}
+                value={fm(pace.projectionCents)}
+                sub={`hoy vas ${fm(pace.curTotalCents)}`}
+              />
+              <Kpi
+                wide
+                label={`Ritmo vs ${pace.prevMonthLabel}`}
+                value={`${pace.vsPrevPct >= 0 ? "+" : ""}${pace.vsPrevPct.toFixed(0)}%`}
+                sub="a igual día del mes"
+                tone={Math.abs(pace.vsPrevPct) < 1 ? undefined : pace.vsPrevPct > 0 ? "neg" : "pos"}
+                note={
+                  Math.abs(pace.vsPrevPct) >= 150
+                    ? `compara ${k.spanDays} días contra 1 mes — dato distorsionado`
+                    : undefined
+                }
+              />
+            </KpiGroup>
+
+            <KpiGroup label="Extremos">
+              <Kpi label="Ticket promedio" value={fm(k.avgTicketCents)} sub={`${k.count} gastos`} />
+              <Kpi label="Gasto más grande" value={fm(k.maxExpenseCents)} />
+              <Kpi
+                label="Día más caro"
+                value={k.maxDayCents ? fm(k.maxDayCents) : "—"}
+                sub={
+                  k.maxDayDate
+                    ? new Date(k.maxDayDate + "T00:00:00").toLocaleDateString("es-AR", {
+                        day: "numeric",
+                        month: "short",
+                      })
+                    : undefined
+                }
+              />
+              <Kpi label="Días sin gastar" value={String(k.daysNoSpend)} sub={`de ${k.spanDays}`} />
+              <Kpi
+                wide
+                label="Recupero"
+                value={`${k.refundRatePct.toFixed(0)}%`}
+                sub={k.reimbursedCents ? fm(k.reimbursedCents) : "sin reintegros"}
+                tone={k.reimbursedCents ? "pos" : undefined}
+              />
+            </KpiGroup>
           </div>
 
           {a.byCategory.length > 0 && (
@@ -282,7 +318,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                     pct={c.pct}
                     fmt={fm}
                     meta={`${c.count} · ${fm(Math.round(c.grossCents / Math.max(c.count, 1)))}/mov`}
-                    fill={`var(--cat-${(colors[c.name] ?? 5) % 6})`}
+                    fill={catColorVar(colors[c.name] ?? -1)}
                   />
                 ))}
               </div>
@@ -301,7 +337,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                     pct={s.pct}
                     fmt={fm}
                     meta={`${s.count}`}
-                    fill={`var(--cat-${(colors[s.categoryName] ?? 5) % 6})`}
+                    fill={catColorVar(colors[s.categoryName] ?? -1)}
                   />
                 ))}
               </div>
@@ -356,15 +392,29 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                       <span className="font-medium">{m.name}</span>
                       <span className="font-semibold tabular-nums">{fm(m.netCents)}</span>
                     </div>
-                    <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
+                    <div className="flex h-3 overflow-hidden rounded-full bg-muted">
                       {m.byCategory.map((c) => (
                         <span
                           key={c.name}
                           style={{
                             width: `${(c.cents / Math.max(m.grossCents, 1)) * 100}%`,
-                            background: `var(--cat-${(colors[c.name] ?? 5) % 6})`,
+                            background: catColorVar(colors[c.name] ?? -1),
                           }}
                         />
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {m.byCategory.slice(0, 3).map((c) => (
+                        <span
+                          key={c.name}
+                          className="inline-flex items-center gap-1 text-[0.66rem] text-muted-foreground"
+                        >
+                          <span
+                            className="size-1.5 shrink-0 rounded-full"
+                            style={{ background: catColorVar(colors[c.name] ?? -1) }}
+                          />
+                          {c.name} {((c.cents / Math.max(m.grossCents, 1)) * 100).toFixed(0)}%
+                        </span>
                       ))}
                     </div>
                     <p className="text-[0.68rem] text-muted-foreground tabular-nums">
@@ -459,22 +509,44 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
           )}
 
           {aiAdvice && aiAdvice.items.length > 0 && (
-            <Section title="Consejos de la IA" hint="generado hoy">
-              <div className="space-y-2">
-                {aiAdvice.items.map((it, idx) => (
-                  <div
-                    key={idx}
-                    className={`flex items-start gap-2.5 rounded-xl border p-3 text-[0.82rem] leading-snug ${ADVICE_STYLES[it.kind]}`}
-                  >
-                    <span className="text-base leading-tight">{it.emoji}</span>
-                    <div className="min-w-0">
-                      <p className="font-medium">{it.title}</p>
-                      <p className="text-muted-foreground">{it.detail}</p>
-                    </div>
-                  </div>
-                ))}
+            <section className="space-y-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-medium">
+                  Consejos de la IA
+                  <span className="rounded-full bg-gradient-to-r from-primary/30 to-violet-400/30 px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-wide text-foreground">
+                    ✦ IA
+                  </span>
+                </h2>
+                <span className="text-xs text-muted-foreground">generado hoy</span>
               </div>
-            </Section>
+              <div className="space-y-2">
+                {aiAdvice.items.map((it, idx) => {
+                  const meta = ADVICE_META[it.kind];
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-2.5 rounded-xl border border-l-[3px] bg-card/40 p-3 text-[0.82rem] leading-snug"
+                      style={{ borderLeftColor: meta.color }}
+                    >
+                      <span className="text-base leading-tight">{it.emoji}</span>
+                      <div className="min-w-0">
+                        <p className="font-medium">{it.title}</p>
+                        <p className="text-muted-foreground">{it.detail}</p>
+                        <span
+                          className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-wide"
+                          style={{
+                            background: `color-mix(in oklab, ${meta.color} 18%, transparent)`,
+                            color: meta.color,
+                          }}
+                        >
+                          {meta.label}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           )}
 
           {insights.length > 0 && (
