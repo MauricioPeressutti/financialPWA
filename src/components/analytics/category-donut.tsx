@@ -39,7 +39,8 @@ export function CategoryDonut({
     const sorted = [...slices].sort((a, b) => b.grossCents - a.grossCents);
     let head = sorted.slice(0, 6);
     if (sorted.length > 6) {
-      // el bucket de sobra: "Otras" para no chocar con una categoría real "Otros"
+      // Bucket de sobra: "Resto" (no "Otras") para no confundirse con una
+      // categoría real llamada "Otros" — se leían casi igual en la leyenda.
       const rest = sorted.slice(5).reduce(
         (acc, s) => ({
           ...acc,
@@ -48,7 +49,7 @@ export function CategoryDonut({
           count: acc.count + s.count,
           pct: acc.pct + s.pct,
         }),
-        { name: "Otras", grossCents: 0, netCents: 0, count: 0, pct: 0 },
+        { name: "Resto", grossCents: 0, netCents: 0, count: 0, pct: 0 },
       );
       head = [...sorted.slice(0, 5), rest];
     }
