@@ -205,6 +205,28 @@ export const cardStatements = pgTable(
   ],
 );
 
+// ─── Consejos de la IA (cache diario, por equipo + moneda) ──
+export const aiInsights = pgTable(
+  "ai_insights",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    currency: text("currency").notNull(),
+    generatedOn: date("generated_on").notNull(),
+    items: jsonb("items").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("ai_insights_team_currency_day_idx").on(
+      t.teamId,
+      t.currency,
+      t.generatedOn,
+    ),
+  ],
+);
+
 // ─── Cotizaciones (cache diario) ───────────────────────
 export const exchangeRates = pgTable(
   "exchange_rates",
@@ -446,3 +468,4 @@ export type CardStatementStatus = (typeof cardStatementStatus.enumValues)[number
 export type PaymentMethod = (typeof paymentMethod.enumValues)[number];
 export type IncomeMethod = (typeof incomeMethod.enumValues)[number];
 export type CategoryKind = (typeof categoryKind.enumValues)[number];
+export type AiInsight = typeof aiInsights.$inferSelect;

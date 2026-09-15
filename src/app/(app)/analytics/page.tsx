@@ -21,6 +21,7 @@ import {
 } from "@/lib/analytics";
 import { parseCustomRange } from "@/lib/analytics-range";
 import { buildInsights } from "@/lib/analytics-insights";
+import { getAiAdvice, type AdviceItem } from "@/lib/ai-advice";
 import { formatMoney } from "@/lib/money";
 import { IncomeMethodTag } from "@/lib/income-methods";
 import { PaymentMethodTag, paymentMethodLabels } from "@/lib/payment-methods";
@@ -83,6 +84,13 @@ function Section({
   );
 }
 
+const ADVICE_STYLES: Record<AdviceItem["kind"], string> = {
+  alerta: "border-destructive/30 bg-destructive/5",
+  ahorro: "border-amber-500/30 bg-amber-500/5",
+  no_recurrente: "border-sky-500/30 bg-sky-500/5",
+  positivo: "border-emerald-500/30 bg-emerald-500/5",
+};
+
 export default async function AnalyticsPage({ searchParams }: PageProps<"/analytics">) {
   const { team } = await requireTeam();
   const sp = await searchParams;
@@ -108,12 +116,13 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
       ? sp.member
       : undefined;
 
-  const [a, trend, pace, expenseCats, heatDays] = await Promise.all([
+  const [a, trend, pace, expenseCats, heatDays, aiAdvice] = await Promise.all([
     getAnalytics(team.id, from, to, cur, memberId),
     getMonthlyTrend(team.id, 12, cur, memberId),
     getSpendPace(team.id, cur, memberId),
     getActiveCategories(team.id, "expense"),
     getDailySpend(team.id, HEATMAP_DAYS, cur, memberId),
+    getAiAdvice(team.id, cur),
   ]);
   const todayIso = new Date().toISOString().slice(0, 10);
 
@@ -445,6 +454,25 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                     </Link>
                   );
                 })}
+              </div>
+            </Section>
+          )}
+
+          {aiAdvice && aiAdvice.items.length > 0 && (
+            <Section title="Consejos de la IA" hint="generado hoy">
+              <div className="space-y-2">
+                {aiAdvice.items.map((it, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-start gap-2.5 rounded-xl border p-3 text-[0.82rem] leading-snug ${ADVICE_STYLES[it.kind]}`}
+                  >
+                    <span className="text-base leading-tight">{it.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium">{it.title}</p>
+                      <p className="text-muted-foreground">{it.detail}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </Section>
           )}
