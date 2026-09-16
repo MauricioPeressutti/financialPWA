@@ -457,6 +457,18 @@ export async function POST(req: Request) {
       } else {
         parsed = await parseReceiptImage({ ...file, caption }, parseOpts);
       }
+
+      // Álbum de fotos (varias mandadas juntas comparten media_group_id):
+      // si el comprobante no dice la forma de pago, default a "débito" en
+      // vez de mostrar botones — preguntarlo foto por foto se vuelve
+      // tedioso con una tanda grande. Una foto sola sigue preguntando.
+      if (
+        msg.media_group_id &&
+        parsed &&
+        !(PAYMENT_METHODS as readonly string[]).includes(parsed.paymentMethod)
+      ) {
+        parsed = { ...parsed, paymentMethod: "debito" };
+      }
     } else {
       parsed = await parseExpenseMessage(text, parseOpts);
     }

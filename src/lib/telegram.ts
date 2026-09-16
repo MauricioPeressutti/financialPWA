@@ -130,6 +130,9 @@ export type TgUpdate = {
     caption?: string;
     photo?: TgPhoto[];
     document?: TgDocument;
+    // Presente cuando el mensaje es parte de un álbum (varias fotos
+    // mandadas juntas): todas comparten el mismo media_group_id.
+    media_group_id?: string;
   };
   callback_query?: {
     id: string;
