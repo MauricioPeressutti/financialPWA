@@ -1,6 +1,7 @@
 import { TeamManager } from "@/components/team-manager";
 import { getUserTeams, requireTeam } from "@/lib/auth";
 import { getFxContext } from "@/lib/fx";
+import { getGameStats } from "@/lib/game-stats";
 import {
   getPendingInvitations,
   getTeamMembers,
@@ -11,12 +12,13 @@ export default async function TeamPage() {
   const { user, team } = await requireTeam();
   const isOwner = team.role === "owner";
 
-  const [members, invites, telegram, fx, myTeams] = await Promise.all([
+  const [members, invites, telegram, fx, myTeams, gameStats] = await Promise.all([
     getTeamMembers(team.id),
     isOwner ? getPendingInvitations(team.id) : Promise.resolve([]),
     getTelegramLink(user.id),
     getFxContext(team),
     getUserTeams(user.id),
+    getGameStats(team.id),
   ]);
 
   return (
@@ -30,6 +32,7 @@ export default async function TeamPage() {
         effortEnabled={team.effortEnabled}
         goalsEnabled={team.goalsEnabled}
         canDelete={myTeams.length > 1}
+        gameStats={gameStats}
         currency={{
           primary: team.primaryCurrency,
           active: team.currencies,

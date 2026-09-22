@@ -41,6 +41,7 @@ import {
   updateTeamCurrencies,
 } from "@/lib/actions/team";
 import { WhoInvites } from "@/components/games/who-invites";
+import type { GameStats } from "@/lib/game-stats";
 import { linkTelegram, unlinkTelegram } from "@/lib/actions/telegram";
 import {
   CURRENCIES,
@@ -98,6 +99,7 @@ export function TeamManager({
   effortEnabled,
   goalsEnabled,
   canDelete,
+  gameStats,
 }: {
   isOwner: boolean;
   currentUserId: string;
@@ -109,6 +111,7 @@ export function TeamManager({
   effortEnabled: boolean;
   goalsEnabled: boolean;
   canDelete: boolean;
+  gameStats: GameStats;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -462,6 +465,7 @@ export function TeamManager({
           id: m.userId,
           name: (m.name ?? m.email).split(" ")[0],
         }))}
+        stats={gameStats}
       />
 
       {/* ── Calculadora de esfuerzo ── */}

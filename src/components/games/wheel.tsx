@@ -21,9 +21,11 @@ const RADIUS = 82;
 export function WheelGame({
   players,
   onBack,
+  onResult,
 }: {
   players: Player[];
   onBack: () => void;
+  onResult?: (payerIds: string[], playerIds: string[]) => void;
 }) {
   const [phase, setPhase] = useState<"idle" | "spinning" | "result">("idle");
   const [winner, setWinner] = useState<number | null>(null);
@@ -69,6 +71,10 @@ export function WheelGame({
         setWinner(w);
         setPhase("result");
         navigator.vibrate?.(40);
+        onResult?.(
+          [players[w].id],
+          players.map((p) => p.id),
+        );
       },
       rm ? 10 : 3700,
     );

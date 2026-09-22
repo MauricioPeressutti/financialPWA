@@ -19,9 +19,11 @@ type Phase = "placing" | "counting" | "result";
 export function FingerGame({
   players,
   onBack,
+  onResult,
 }: {
   players: Player[];
   onBack: () => void;
+  onResult?: (payerIds: string[], playerIds: string[]) => void;
 }) {
   const [fingers, setFingers] = useState<Finger[]>([]);
   const [phase, setPhase] = useState<Phase>("placing");
@@ -47,9 +49,14 @@ export function FingerGame({
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(
       () => {
-        setWinner(Math.floor(Math.random() * fingers.length));
+        const w = Math.floor(Math.random() * fingers.length);
+        setWinner(w);
         setPhase("result");
         navigator.vibrate?.([0, 30, 20, 40]);
+        onResult?.(
+          [fingers[w].p.id],
+          fingers.map((f) => f.p.id),
+        );
       },
       rm ? 10 : 2400,
     );

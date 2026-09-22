@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { CosmicBackground } from "@/components/cosmic-background";
@@ -10,6 +11,8 @@ import { DiceGame } from "@/components/games/dice";
 import { FingerGame } from "@/components/games/finger";
 import { WheelGame } from "@/components/games/wheel";
 import { Dot, type Player } from "@/components/games/shared";
+import { logGameRound } from "@/lib/actions/games";
+import type { GameStats } from "@/lib/game-stats";
 
 type GameId = "coin" | "wheel" | "finger" | "dice";
 
@@ -29,7 +32,15 @@ const GAMES: {
 const fits = (g: (typeof GAMES)[number], n: number) =>
   n >= 2 && (!g.needsEven || n % 2 === 0);
 
-export function WhoInvites({ players }: { players: Player[] }) {
+export function WhoInvites({
+  players,
+  stats,
+}: {
+  players: Player[];
+  stats: GameStats;
+}) {
+  const router = useRouter();
+  const [, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(players.map((p) => p.id)),
@@ -37,6 +48,18 @@ export function WhoInvites({ players }: { players: Player[] }) {
   const [view, setView] = useState<"select" | GameId>("select");
 
   const chosen = players.filter((p) => selected.has(p.id));
+
+  function handleResult(game: GameId, payerIds: string[], playerIds: string[]) {
+    startTransition(async () => {
+      await logGameRound(game, playerIds, payerIds);
+      router.refresh();
+    });
+  }
+
+  const ranking = [...players]
+    .map((p) => ({ p, s: stats[p.id] ?? { played: 0, paid: 0 } }))
+    .filter((r) => r.s.played > 0)
+    .sort((a, b) => b.s.paid - a.s.paid);
 
   useEffect(() => {
     if (!open) return;
@@ -178,15 +201,64 @@ export function WhoInvites({ players }: { players: Player[] }) {
                       ? "Con impar, la moneda queda deshabilitada."
                       : ""}
                 </p>
+
+                {ranking.length > 0 && (
+                  <div className="mt-4 rounded-2xl border border-border bg-white/[0.03] p-3">
+                    <p className="mb-2 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Quién invitó más
+                    </p>
+                    <div className="space-y-1.5">
+                      {ranking.map(({ p, s }) => (
+                        <div
+                          key={p.id}
+                          className="flex items-center gap-2 text-xs"
+                        >
+                          <Dot p={p} size="sm" />
+                          <span className="min-w-0 flex-1 truncate font-medium">
+                            {p.name}
+                          </span>
+                          <span className="shrink-0 tabular-nums text-muted-foreground">
+                            invitó {s.paid}/{s.played} ·{" "}
+                            {Math.round((s.paid / s.played) * 100)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : view === "coin" ? (
-              <CoinGame players={chosen} onBack={() => setView("select")} />
+              <CoinGame
+                players={chosen}
+                onBack={() => setView("select")}
+                onResult={(payerIds, playerIds) =>
+                  handleResult("coin", payerIds, playerIds)
+                }
+              />
             ) : view === "wheel" ? (
-              <WheelGame players={chosen} onBack={() => setView("select")} />
+              <WheelGame
+                players={chosen}
+                onBack={() => setView("select")}
+                onResult={(payerIds, playerIds) =>
+                  handleResult("wheel", payerIds, playerIds)
+                }
+              />
             ) : view === "finger" ? (
-              <FingerGame players={chosen} onBack={() => setView("select")} />
+              <FingerGame
+                players={chosen}
+                onBack={() => setView("select")}
+                onResult={(payerIds, playerIds) =>
+                  handleResult("finger", payerIds, playerIds)
+                }
+              />
             ) : (
-              <DiceGame players={chosen} onBack={() => setView("select")} />
+              <DiceGame
+                players={chosen}
+                onBack={() => setView("select")}
+                onResult={(payerIds, playerIds) =>
+                  handleResult("dice", payerIds, playerIds)
+                }
+              />
             )}
           </div>
         </div>

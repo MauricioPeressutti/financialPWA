@@ -87,9 +87,11 @@ function Team({
 export function CoinGame({
   players,
   onBack,
+  onResult,
 }: {
   players: Player[];
   onBack: () => void;
+  onResult?: (payerIds: string[], playerIds: string[]) => void;
 }) {
   const [phase, setPhase] = useState<"idle" | "flipping" | "result">("idle");
   const [result, setResult] = useState<Result | null>(null);
@@ -99,6 +101,7 @@ export function CoinGame({
   const coinRef = useRef<HTMLDivElement>(null);
   const degRef = useRef(0);
   const timer = useRef<number | undefined>(undefined);
+  const resultRef = useRef<Result | null>(null);
 
   useEffect(() => {
     if (coinRef.current) {
@@ -110,6 +113,13 @@ export function CoinGame({
 
   function land() {
     setPhase("result");
+    const r = resultRef.current;
+    if (r) {
+      onResult?.(
+        (r.side === "cara" ? r.cara : r.cruz).map((p) => p.id),
+        [...r.cara, ...r.cruz].map((p) => p.id),
+      );
+    }
     if (!prefersReduced()) {
       setSparks(
         Array.from({ length: 18 }, (_, i) => {
@@ -141,6 +151,7 @@ export function CoinGame({
       cruz: mixed.slice(half),
     };
     setResult(r);
+    resultRef.current = r;
     setPhase("flipping");
     setSparks([]);
 

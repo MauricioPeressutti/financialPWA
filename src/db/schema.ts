@@ -205,6 +205,22 @@ export const cardStatements = pgTable(
   ],
 );
 
+// ─── "¿Quién invita hoy?" — historial de rondas jugadas ──
+export const gameRounds = pgTable(
+  "game_rounds",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    game: text("game").notNull(), // "coin" | "wheel" | "finger" | "dice"
+    playerIds: jsonb("player_ids").notNull().$type<string[]>(), // quiénes jugaron esa ronda
+    payerIds: jsonb("payer_ids").notNull().$type<string[]>(), // quién/es invitan
+    playedAt: timestamp("played_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("game_rounds_team_idx").on(t.teamId)],
+);
+
 // ─── Consejos de la IA (cache diario, por equipo + moneda) ──
 export const aiInsights = pgTable(
   "ai_insights",
@@ -469,3 +485,4 @@ export type PaymentMethod = (typeof paymentMethod.enumValues)[number];
 export type IncomeMethod = (typeof incomeMethod.enumValues)[number];
 export type CategoryKind = (typeof categoryKind.enumValues)[number];
 export type AiInsight = typeof aiInsights.$inferSelect;
+export type GameRound = typeof gameRounds.$inferSelect;

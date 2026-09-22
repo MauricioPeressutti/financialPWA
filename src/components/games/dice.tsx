@@ -48,9 +48,11 @@ function DieFaces() {
 export function DiceGame({
   players,
   onBack,
+  onResult,
 }: {
   players: Player[];
   onBack: () => void;
+  onResult?: (payerIds: string[], playerIds: string[]) => void;
 }) {
   const [phase, setPhase] = useState<"idle" | "rolling" | "result">("idle");
   const [losers, setLosers] = useState<number[]>([]);
@@ -94,7 +96,13 @@ export function DiceGame({
         setResultMin(min);
         setLosers(ls);
         setPhase("result");
-        if (ls.length === 1) navigator.vibrate?.([0, 30, 20, 40]);
+        if (ls.length === 1) {
+          navigator.vibrate?.([0, 30, 20, 40]);
+          onResult?.(
+            [players[ls[0]].id],
+            players.map((p) => p.id),
+          );
+        }
       },
       rm ? 20 : 1300 + indices.length * 70,
     );
