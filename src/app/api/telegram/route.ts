@@ -10,6 +10,7 @@ import {
   teamMembers,
   teams,
   telegramLinks,
+  tgProcessedUpdates,
 } from "@/db/schema";
 import { isCurrency } from "@/lib/currencies";
 import { insertExpense } from "@/lib/expenses-core";
@@ -324,6 +325,30 @@ export async function POST(req: Request) {
     update = (await req.json()) as TgUpdate;
   } catch {
     return OK();
+  }
+
+  // Dedupe: si el webhook tarda (Gemini saturado), Telegram re-entrega el
+  // mismo update y cada re-entrega cargaba el movimiento otra vez. Si este
+  // update_id ya lo vimos, salimos. Si la tabla falla, seguimos igual.
+  if (typeof update.update_id === "number") {
+    try {
+      const ins = await db
+        .insert(tgProcessedUpdates)
+        .values({ updateId: update.update_id })
+        .onConflictDoNothing()
+        .returning({ updateId: tgProcessedUpdates.updateId });
+      if (ins.length === 0) return OK();
+      if (Math.random() < 0.05) {
+        await db
+          .delete(tgProcessedUpdates)
+          .where(
+            lt(tgProcessedUpdates.at, new Date(Date.now() - 3 * 86400000)),
+          )
+          .catch(() => {});
+      }
+    } catch (e) {
+      console.error("tg dedupe:", e);
+    }
   }
 
   try {
