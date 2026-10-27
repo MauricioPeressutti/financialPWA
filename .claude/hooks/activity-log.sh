@@ -8,10 +8,16 @@ input="$(cat 2>/dev/null)"
 root="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 [ -d "$root/.factory" ] || exit 0
 
-# Extraer campos del JSON del evento (python3 si está; si no, sed básico)
+# Python real (en Windows "python3" puede ser un alias de la Microsoft Store que no funciona)
+PY=""
+for c in python3 python "py -3"; do
+  if $c -c "import json" >/dev/null 2>&1; then PY="$c"; break; fi
+done
+
+# Extraer campos del JSON del evento (Python si está; si no, sed básico)
 get() {
-  if command -v python3 >/dev/null 2>&1; then
-    printf '%s' "$input" | python3 -c "
+  if [ -n "$PY" ]; then
+    printf '%s' "$input" | $PY -c "
 import json,sys
 try:
     d=json.load(sys.stdin)
