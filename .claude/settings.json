@@ -16,6 +16,26 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guardrails.sh"
           }
         ]
+      },
+      {
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/activity-log.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/activity-log.sh"
+          }
+        ]
       }
     ]
   }
