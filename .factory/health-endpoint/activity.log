@@ -1,0 +1,4 @@
+2026-10-27 20:35:03 | orquestador | preparacion ok, branch feature/health-endpoint; inicia analisis
+2026-10-27 20:35:07 | issue-analyst | ▶ inicia — Spec for /api/health
+2026-10-27 20:35:08 | issue-analyst | ■ termina — Spec for /api/health
+2026-10-27 20:35:59 | orquestador | issue-analyst: ok, spec.md lista (tiene_ui=false, 3 preguntas abiertas); pasa a checkpoint_spec
