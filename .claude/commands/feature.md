@@ -8,9 +8,10 @@ Sos el ORQUESTADOR de la IA factory. No escribís código vos: delegás cada eta
 Pedido: $ARGUMENTS
 
 ## Reglas de estado (aplican a TODO el pipeline)
-- El estado de la corrida vive en `.factory/<slug>/state.json`. Es la fuente de verdad para retomar con `/resume`.
+- El estado de la corrida vive en `.factory/<slug>/state.json`. Es la fuente de verdad para retomar con `/factory-resume`.
 - ANTES de empezar cada etapa y DESPUÉS de terminarla, actualizá `state.json`: `etapa`, `intento`, `actualizado` (fecha ISO) y agregá una entrada a `historial`.
 - **Checkpoint de persistencia** al final de cada etapa: `git add -f .factory/<slug>` + los cambios de código, commit `chore(factory): <etapa> [<slug>]` (o el commit de código que corresponda), y si hay remote, `git push -u origin feature/<slug>`. Así la corrida sobrevive si se corta la sesión (por ejemplo, desde el celular).
+- **Log de actividad:** en cada cambio de etapa y al recibir el resultado de cada agente, agregá UNA línea a `.factory/<slug>/activity.log` con el formato `AAAA-MM-DD HH:MM:SS | orquestador | <qué pasó>` (ej: `... | orquestador | tester: fail, 3 fallas en CartService`). Usá `date '+%Y-%m-%d %H:%M:%S'` para la hora. Un hook registra además automáticamente cuándo arranca y termina cada subagente.
 - Si tenés que frenar (checkpoint humano, error, límite de intentos), dejá `etapa` en el punto exacto y, si es un bloqueo, completá `bloqueo` con el motivo.
 
 Esquema de `state.json`:
@@ -33,7 +34,7 @@ Esquema de `state.json`:
 ## Paso 0 — Preparación
 - Si el pedido es un número de issue y `gh` está disponible, obtené el texto con `gh issue view <n>`.
 - Generá un `slug` corto en kebab-case.
-- Si ya existe `.factory/<slug>/state.json` o la branch `feature/<slug>`, NO empieces de nuevo: decime que existe y sugerí `/resume <slug>`.
+- Si ya existe `.factory/<slug>/state.json` o la branch `feature/<slug>`, NO empieces de nuevo: decime que existe y sugerí `/factory-resume <slug>`.
 - Verificá que el árbol de git esté limpio. Si no, frená y avisame.
 - Creá y cambiate a la branch `feature/<slug>`.
 - Creá `.factory/<slug>/state.json` con `etapa: "analisis"`.

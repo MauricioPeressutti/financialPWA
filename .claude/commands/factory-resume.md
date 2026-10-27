@@ -1,5 +1,5 @@
 ---
-description: Retoma una corrida de la IA factory desde donde quedó (lee .factory/<slug>/state.json). Sin argumento, lista las corridas.
+description: (IA factory) Retoma una corrida de la IA factory desde donde quedó (lee .factory/<slug>/state.json). Sin argumento, lista las corridas.
 argument-hint: [slug]
 ---
 
