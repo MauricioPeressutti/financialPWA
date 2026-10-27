@@ -105,6 +105,7 @@ function renderMovement(a: {
   catName: string;
   subName: string | null;
   method: string | null; // null = todavía sin elegir
+  picking?: boolean; // mostrar los botones de forma de pago para cambiarla
   entity?: string | null;
   reimbursedCents: number | null;
   description: string | null;
@@ -143,23 +144,80 @@ function renderMovement(a: {
   if (lowConf && a.note) lines.push(`\n<i>${a.note}</i>`);
 
   const kb: Btn[][] = [];
-  if (!a.method) {
+  const del: Btn = {
+    text: "🗑️ Borrar",
+    callback_data: `${income ? "dinc" : "del"}:${a.id}`,
+  };
+  if (!a.method || a.picking) {
     const methods = income ? INCOME_METHODS : PAYMENT_METHODS;
     const prefix = income ? "seti" : "setm";
     let row: Btn[] = [];
     for (const m of methods) {
-      row.push({ text: meta[m].label, callback_data: `${prefix}:${a.id}:${m}` });
+      const label = m === a.method ? `✓ ${meta[m].label}` : meta[m].label;
+      row.push({ text: label, callback_data: `${prefix}:${a.id}:${m}` });
       if (row.length === 2) {
         kb.push(row);
         row = [];
       }
     }
     if (row.length) kb.push(row);
+    kb.push([del]);
+  } else {
+    kb.push([
+      {
+        text: "✏️ Forma de pago",
+        callback_data: `${income ? "chi" : "chm"}:${a.id}`,
+      },
+      del,
+    ]);
   }
-  kb.push([
-    { text: "🗑️ Borrar", callback_data: `${income ? "dinc" : "del"}:${a.id}` },
-  ]);
   return { text: lines.join("\n"), keyboard: kb };
+}
+
+/** Vuelve a armar el mensaje de un gasto/ingreso ya guardado (leyéndolo de la base). */
+async function renderStored(
+  teamId: string,
+  income: boolean,
+  id: string,
+  picking = false,
+) {
+  if (income) {
+    const row = await getIncome(teamId, id);
+    if (!row) return null;
+    return renderMovement({
+      kind: "ingreso",
+      id,
+      amountCents: row.amountCents,
+      currency: row.currency,
+      baseAmountCents: row.baseAmountCents,
+      catName: row.categoryName,
+      subName: row.subcategoryName,
+      method: row.method,
+      picking,
+      entity: row.entity,
+      reimbursedCents: null,
+      description: row.description,
+      on: String(row.receivedOn),
+    });
+  }
+  const row = await getExpense(teamId, id);
+  if (!row) return null;
+  const reimb = row.reimbursements.reduce((s, r) => s + r.amountCents, 0);
+  return renderMovement({
+    kind: "gasto",
+    id,
+    amountCents: row.amountCents,
+    currency: row.currency,
+    baseAmountCents: row.baseAmountCents,
+    catName: row.categoryName,
+    subName: row.subcategoryName,
+    method: row.paymentMethod,
+    picking,
+    entity: row.entity,
+    reimbursedCents: reimb || null,
+    description: row.description,
+    on: String(row.spentOn),
+  });
 }
 
 type Commit = { text: string; keyboard: Btn[][] } | { errorMsg: string };
@@ -250,10 +308,12 @@ async function commitMovement(
     return { errorMsg: "El equipo no tiene categorías. Creá alguna en la app." };
   const sub =
     cat.subcategories.find((s) => norm(s.name) === norm(p.subcategory)) ?? null;
-  const stated = (PAYMENT_METHODS as readonly string[]).includes(p.paymentMethod);
-  const method: PaymentMethod = stated
+  // Sin forma de pago clara → débito; se cambia con "✏️ Forma de pago".
+  const method: PaymentMethod = (
+    PAYMENT_METHODS as readonly string[]
+  ).includes(p.paymentMethod)
     ? (p.paymentMethod as PaymentMethod)
-    : "efectivo";
+    : "debito";
   const reimbursedCents =
     p.reimbursed > 0 ? Math.round(p.reimbursed * 100) : null;
   const { id } = await insertExpense(teamId, userId, {
@@ -279,7 +339,7 @@ async function commitMovement(
     baseAmountCents,
     catName: cat.name,
     subName: sub?.name ?? null,
-    method: stated ? method : null,
+    method,
     entity: p.entity || null,
     reimbursedCents,
     description: p.description || null,
@@ -482,18 +542,6 @@ export async function POST(req: Request) {
       } else {
         parsed = await parseReceiptImage({ ...file, caption }, parseOpts);
       }
-
-      // Álbum de fotos (varias mandadas juntas comparten media_group_id):
-      // si el comprobante no dice la forma de pago, default a "débito" en
-      // vez de mostrar botones — preguntarlo foto por foto se vuelve
-      // tedioso con una tanda grande. Una foto sola sigue preguntando.
-      if (
-        msg.media_group_id &&
-        parsed &&
-        !(PAYMENT_METHODS as readonly string[]).includes(parsed.paymentMethod)
-      ) {
-        parsed = { ...parsed, paymentMethod: "debito" };
-      }
     } else {
       parsed = await parseExpenseMessage(text, parseOpts);
     }
@@ -642,7 +690,23 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
     return;
   }
 
-  // ── elegir forma de pago / medio de un movimiento recién cargado ──
+  // ── "✏️ Forma de pago": mostrar los botones para cambiarla ──
+  if (data.startsWith("chm:") || data.startsWith("chi:")) {
+    const income = data.startsWith("chi:");
+    const r = await renderStored(teamId, income, data.slice(4), true);
+    if (!r) {
+      await answerCallbackQuery(
+        cq.id,
+        income ? "Ese ingreso ya no está." : "Ese gasto ya no está.",
+      );
+      return;
+    }
+    await editMessageText(chatId, messageId, r.text, r.keyboard);
+    await answerCallbackQuery(cq.id);
+    return;
+  }
+
+  // ── elegir forma de pago / medio de un movimiento ──
   if (data.startsWith("setm:") || data.startsWith("seti:")) {
     const income = data.startsWith("seti:");
     const [, mid, m] = data.split(":");
@@ -663,24 +727,8 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
         await answerCallbackQuery(cq.id, "Ese ingreso ya no está.");
         return;
       }
-      const row = await getIncome(teamId, mid);
-      if (row) {
-        const { text, keyboard } = renderMovement({
-          kind: "ingreso",
-          id: mid,
-          amountCents: row.amountCents,
-          currency: row.currency,
-          baseAmountCents: row.baseAmountCents,
-          catName: row.categoryName,
-          subName: row.subcategoryName,
-          method: row.method,
-          entity: row.entity,
-          reimbursedCents: null,
-          description: row.description,
-          on: String(row.receivedOn),
-        });
-        await editMessageText(chatId, messageId, text, keyboard);
-      }
+      const r = await renderStored(teamId, true, mid);
+      if (r) await editMessageText(chatId, messageId, r.text, r.keyboard);
     } else {
       const upd = await db
         .update(expenses)
@@ -691,25 +739,8 @@ async function handleCallback(cq: NonNullable<TgUpdate["callback_query"]>) {
         await answerCallbackQuery(cq.id, "Ese gasto ya no está.");
         return;
       }
-      const row = await getExpense(teamId, mid);
-      if (row) {
-        const reimb = row.reimbursements.reduce((s, r) => s + r.amountCents, 0);
-        const { text, keyboard } = renderMovement({
-          kind: "gasto",
-          id: mid,
-          amountCents: row.amountCents,
-          currency: row.currency,
-          baseAmountCents: row.baseAmountCents,
-          catName: row.categoryName,
-          subName: row.subcategoryName,
-          method: row.paymentMethod,
-          entity: row.entity,
-          reimbursedCents: reimb || null,
-          description: row.description,
-          on: String(row.spentOn),
-        });
-        await editMessageText(chatId, messageId, text, keyboard);
-      }
+      const r = await renderStored(teamId, false, mid);
+      if (r) await editMessageText(chatId, messageId, r.text, r.keyboard);
     }
     revalidatePath("/");
     revalidatePath("/movimientos");

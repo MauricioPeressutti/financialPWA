@@ -23,6 +23,7 @@ export const paymentMethod = pgEnum("payment_method", [
   "modo_debito",
   "modo_credito",
   "mercadopago",
+  "transferencia",
 ]);
 
 export const incomeMethod = pgEnum("income_method", [

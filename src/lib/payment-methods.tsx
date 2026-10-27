@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { Banknote, CreditCard } from "lucide-react";
+import { ArrowLeftRight, Banknote, CreditCard } from "lucide-react";
 
 export const PAYMENT_METHODS = [
   "efectivo",
@@ -8,6 +8,7 @@ export const PAYMENT_METHODS = [
   "modo_debito",
   "modo_credito",
   "mercadopago",
+  "transferencia",
 ] as const;
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
@@ -34,6 +35,7 @@ export const paymentMethodMeta: Record<
   modo_debito: { label: "MODO débito", Icon: ModoIcon },
   modo_credito: { label: "MODO crédito", Icon: ModoIcon },
   mercadopago: { label: "Mercado Pago", Icon: MercadoPagoIcon },
+  transferencia: { label: "Transferencia", Icon: ArrowLeftRight },
 };
 
 export const paymentMethodLabels: Record<string, string> = Object.fromEntries(
