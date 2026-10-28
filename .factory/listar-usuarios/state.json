@@ -6,7 +6,7 @@
   "intento": 0,
   "max_intentos": 5,
   "ux_vueltas": 0,
-  "tiene_ui": false,
+  "tiene_ui": true,
   "bloqueo": null,
   "historial": [
     {
@@ -18,7 +18,17 @@
       "etapa": "analisis",
       "resultado": "ok",
       "fecha": "2026-10-28T00:02:55Z"
+    },
+    {
+      "etapa": "checkpoint_spec",
+      "resultado": "cambios: agregar UI y probarla",
+      "fecha": "2026-10-28T00:04:18Z"
+    },
+    {
+      "etapa": "analisis",
+      "resultado": "ok (v2: con UI admin)",
+      "fecha": "2026-10-28T00:07:45Z"
     }
   ],
-  "actualizado": "2026-10-28T00:02:55Z"
+  "actualizado": "2026-10-28T00:07:45Z"
 }

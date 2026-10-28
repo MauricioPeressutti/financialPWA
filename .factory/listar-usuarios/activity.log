@@ -2,3 +2,7 @@
 2026-10-27 21:01:34 | issue-analyst | ▶ inicia — Spec for list-users endpoint
 2026-10-27 21:01:35 | issue-analyst | ■ termina — Spec for list-users endpoint
 2026-10-27 21:02:55 | orquestador | issue-analyst: ok, spec.md lista (tiene_ui=false, 16 CA, P1 bloquea con default); pasa a checkpoint_spec
+2026-10-27 21:04:18 | orquestador | checkpoint_spec: usuario pide cambios (agregar UI + probarla); vuelve a analisis
+2026-10-27 21:04:29 | issue-analyst | ▶ inicia — Revise spec: add admin UI
+2026-10-27 21:04:30 | issue-analyst | ■ termina — Revise spec: add admin UI
+2026-10-27 21:07:45 | orquestador | issue-analyst: ok, spec v2 con UI (/admin/usuarios, ADMIN_EMAILS, 22 CA, nada bloquea); pasa a checkpoint_spec
