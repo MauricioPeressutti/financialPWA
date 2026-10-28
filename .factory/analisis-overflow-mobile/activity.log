@@ -1,2 +1,19 @@
 2026-10-27 21:16:49 | orquestador | preparacion ok, branch feature/analisis-overflow-mobile (desde main)
 2026-10-27 21:16:49 | orquestador | issue-analyst: ok, spec.md lista (tiene_ui=true, 14 CA, 7 causas, nada bloquea); pasa a checkpoint_spec
+2026-10-27 21:19:06 | orquestador | checkpoint_spec aprobado por el usuario (panel, defaults P1-P4); pasa a tests
+2026-10-27 21:20:00 | orquestador | BLOQUEO: no se pudo lanzar tdd-writer, el hook PreToolUse:Agent activity-log.sh falla (no hay Git Bash)
+2026-10-27 22:00:00 | orquestador | resume ("OK, aprobado"): reintento tdd-writer, mismo BLOQUEO del hook activity-log.sh (sin Git Bash)
+2026-10-27 21:53:25 | orquestador | resume ("OK, aprobado"): hook ya funciona; tdd-writer: RED, 35 tests (24 fail, 11 guardas), npm test con runner nativo de Node; pasa a loop
+2026-10-27 21:47:04 | tdd-writer | ▶ inicia — TDD RED tests overflow
+2026-10-27 21:53:20 | tdd-writer | ■ termina — TDD RED tests overflow
+2026-10-27 21:53:46 | builder | ▶ inicia — Builder GREEN intento 1
+2026-10-27 21:57:40 | builder | ■ termina — Builder GREEN intento 1
+2026-10-27 21:57:45 | orquestador | builder intento 1: npm test 35 de 35, tsc ok; lint con 3 errores preexistentes fuera de alcance; build sin correr
+2026-10-27 21:57:51 | tester | ▶ inicia — Tester intento 1
+2026-10-27 21:59:53 | tester | ■ termina — Tester intento 1
+2026-10-27 22:00:00 | orquestador | tester intento 1: pass (35/35, tsc ok, build ok; lint falla solo por errores preexistentes en main); pasa a ux
+2026-10-27 22:00:07 | ux-reviewer | ▶ inicia — UX review overflow fix
+2026-10-27 22:07:15 | ux-reviewer | ■ termina — UX review overflow fix
+2026-10-27 22:07:30 | orquestador | ux-reviewer: aprobado con observaciones (0 ALTA, 1 MEDIA alineacion BarRow, 6 BAJA); pasa a checkpoint_entrega
+2026-10-27 22:11:07 | orquestador | checkpoint_entrega aprobado; paso a entrega (deployer)
+2026-10-27 22:11:22 | deployer | ▶ inicia — Entrega analisis-overflow-mobile
