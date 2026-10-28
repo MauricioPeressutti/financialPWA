@@ -1,0 +1,16 @@
+{
+  "slug": "analisis-overflow-mobile",
+  "pedido": "bug visual en la vista de análisis (iPhone 16 Pro)",
+  "branch": "feature/analisis-overflow-mobile",
+  "etapa": "checkpoint_spec",
+  "intento": 0,
+  "max_intentos": 5,
+  "ux_vueltas": 0,
+  "tiene_ui": true,
+  "bloqueo": null,
+  "historial": [
+    { "etapa": "preparacion", "resultado": "ok", "fecha": "2026-10-28T00:16:49Z" },
+    { "etapa": "analisis", "resultado": "ok", "fecha": "2026-10-28T00:16:49Z" }
+  ],
+  "actualizado": "2026-10-28T00:16:49Z"
+}
