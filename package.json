@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --import ./tests/setup/register.mjs --test \"tests/**/*.test.mjs\"",
     "icons": "node scripts/gen-icons.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
