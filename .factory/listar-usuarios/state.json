@@ -1,0 +1,24 @@
+{
+  "slug": "listar-usuarios",
+  "pedido": "Creame un endpoint que me permita enlistar todos los usuarios de esta app",
+  "branch": "feature/listar-usuarios",
+  "etapa": "checkpoint_spec",
+  "intento": 0,
+  "max_intentos": 5,
+  "ux_vueltas": 0,
+  "tiene_ui": false,
+  "bloqueo": null,
+  "historial": [
+    {
+      "etapa": "preparacion",
+      "resultado": "ok",
+      "fecha": "2026-10-28T00:01:25Z"
+    },
+    {
+      "etapa": "analisis",
+      "resultado": "ok",
+      "fecha": "2026-10-28T00:02:55Z"
+    }
+  ],
+  "actualizado": "2026-10-28T00:02:55Z"
+}

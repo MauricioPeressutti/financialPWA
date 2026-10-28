@@ -1,0 +1,4 @@
+2026-10-27 21:01:26 | orquestador | preparacion ok, branch feature/listar-usuarios (desde main); inicia analisis
+2026-10-27 21:01:34 | issue-analyst | ▶ inicia — Spec for list-users endpoint
+2026-10-27 21:01:35 | issue-analyst | ■ termina — Spec for list-users endpoint
+2026-10-27 21:02:55 | orquestador | issue-analyst: ok, spec.md lista (tiene_ui=false, 16 CA, P1 bloquea con default); pasa a checkpoint_spec
