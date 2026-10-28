@@ -94,7 +94,7 @@ export function AnalyticsRange({
                 setFrom(e.target.value);
                 applyCustom(e.target.value, to);
               }}
-              className="h-8 w-full px-2"
+              className="h-8 w-full appearance-none px-2 text-left [&::-webkit-date-and-time-value]:text-left"
             />
           </label>
           <label className="min-w-0 space-y-1">
@@ -108,7 +108,7 @@ export function AnalyticsRange({
                 setTo(e.target.value);
                 applyCustom(from, e.target.value);
               }}
-              className="h-8 w-full px-2"
+              className="h-8 w-full appearance-none px-2 text-left [&::-webkit-date-and-time-value]:text-left"
             />
           </label>
         </div>

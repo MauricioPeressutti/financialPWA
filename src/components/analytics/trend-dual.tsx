@@ -24,11 +24,20 @@ export function TrendDual({
   return (
     <div>
       <div className="flex h-[130px] items-end gap-[5px] pt-4">
-        {data.map((d) => (
+        {data.map((d, i) => (
           <div key={d.month} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
             <div className="relative flex h-full w-full items-end justify-center gap-[2px]">
               {d.month === peak.month && peak.netCents > 0 && (
-                <span className="pointer-events-none absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap text-[0.56rem] font-medium text-muted-foreground">
+                <span
+                  className={`pointer-events-none absolute -top-4 whitespace-nowrap text-[0.56rem] font-medium text-muted-foreground ${
+                    // En los extremos se ancla al borde para no salirse del Card.
+                    i === 0
+                      ? "left-0"
+                      : i === data.length - 1
+                        ? "right-0"
+                        : "left-1/2 -translate-x-1/2"
+                  }`}
+                >
                   {compact(d.netCents)}
                 </span>
               )}

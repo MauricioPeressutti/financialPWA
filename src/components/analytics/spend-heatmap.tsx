@@ -3,6 +3,10 @@
 import { useMemo, useState } from "react";
 
 import { formatMoney } from "@/lib/money";
+import { clampTooltipLeft } from "@/lib/tooltip-position";
+
+/** Ancho máximo del tooltip (coincide con `max-w-[200px]`). */
+const TIP_MAX_W = 200;
 
 type Day = { date: string; cents: number; count: number };
 
@@ -21,7 +25,14 @@ export function SpendHeatmap({
   weeks?: number;
 }) {
   const formatCents = (c: number) => formatMoney(c, currency);
-  const [tip, setTip] = useState<{ x: number; y: number; t: string; r: string } | null>(null);
+  const [tip, setTip] = useState<{
+    x: number;
+    y: number;
+    /** Ancho real del contenedor al momento de mostrar el tooltip. */
+    w: number;
+    t: string;
+    r: string;
+  } | null>(null);
 
   const { cells, weeks, levels } = useMemo(() => {
     const map = new Map(days.map((d) => [d.date, d]));
@@ -91,6 +102,7 @@ export function SpendHeatmap({
             setTip({
               x: e.clientX - rect.left,
               y: e.clientY - rect.top,
+              w: rect.width,
               t: new Date(c.date + "T00:00:00").toLocaleDateString("es-AR", {
                 weekday: "long",
                 day: "numeric",
@@ -131,7 +143,7 @@ export function SpendHeatmap({
         <div
           className="pointer-events-none absolute z-10 max-w-[200px] rounded-lg border border-border bg-popover px-2.5 py-1.5 text-xs shadow-lg"
           style={{
-            left: Math.min(tip.x + 12, 280),
+            left: clampTooltipLeft(tip.x, tip.w, TIP_MAX_W),
             top: Math.max(tip.y - 46, 0),
           }}
         >
