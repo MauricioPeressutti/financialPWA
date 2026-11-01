@@ -1,3 +1,7 @@
 2026-11-01 00:00:00 | issue-analyst | spec.md escrita (tiene_ui=true, 28 CA, P1-P6 con default, nada bloquea)
 2026-11-01 00:00:00 | issue-analyst | state.json creado en etapa checkpoint_spec; rama feature/gastos-fijos NO creada (el analista no tiene git)
 2026-11-01 01:00:40 | orquestador | branch feature/gastos-fijos creada, bloqueo resuelto; en checkpoint_spec
+2026-11-01 01:01:16 | orquestador | checkpoint_spec: aprobado por el usuario; pasa a tests
+2026-11-01 01:01:28 | tdd-writer | ▶ inicia — Write RED tests gastos-fijos
+2026-11-01 01:17:44 | tdd-writer | ■ termina — Write RED tests gastos-fijos
+2026-11-01 01:17:56 | orquestador | tdd-writer: RED confirmado, 116/122 fallan por falta de implementacion; pasa a loop

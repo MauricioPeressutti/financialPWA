@@ -2,7 +2,7 @@
   "slug": "gastos-fijos",
   "pedido": "modulo de gastos fijos mensuales por usuario: 'ya lo pague' o vincular a un gasto",
   "branch": "feature/gastos-fijos",
-  "etapa": "checkpoint_spec",
+  "etapa": "loop",
   "pr": null,
   "intento": 0,
   "max_intentos": 5,
@@ -24,7 +24,17 @@
       "etapa": "preparacion",
       "resultado": "ok (branch creada por orquestador)",
       "fecha": "2026-11-01T04:00:39Z"
+    },
+    {
+      "etapa": "checkpoint_spec",
+      "resultado": "ok: spec aprobada por el usuario (defaults P1-P6)",
+      "fecha": "2026-11-01T04:01:16Z"
+    },
+    {
+      "etapa": "tests",
+      "resultado": "ok: RED confirmado (122 tests, 116 fallan, 6 sanidad fake-db en verde); vitest 4.0.18",
+      "fecha": "2026-11-01T04:17:56Z"
     }
   ],
-  "actualizado": "2026-11-01T04:00:39Z"
+  "actualizado": "2026-11-01T04:17:56Z"
 }
