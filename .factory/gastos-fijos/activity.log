@@ -12,3 +12,6 @@
 2026-11-01 01:28:15 | tester | ▶ inicia — Verify gastos-fijos (intento 1)
 2026-11-01 01:30:47 | tester | ■ termina — Verify gastos-fijos (intento 1)
 2026-11-01 01:31:59 | orquestador | tester intento 1: fail solo por EPERM en .next; orquestador re-corrio build OK -> pass; pasa a ux
+2026-11-01 01:32:11 | ux-reviewer | ▶ inicia — UX review gastos-fijos
+2026-11-01 01:36:03 | ux-reviewer | ■ termina — UX review gastos-fijos
+2026-11-01 01:36:09 | orquestador | ux-reviewer: 0 ALTA / 6 MEDIA / 12 BAJA, estatico; pasa a checkpoint_entrega
