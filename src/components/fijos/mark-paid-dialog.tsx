@@ -34,6 +34,7 @@ type Props = {
   };
   period: string;
   defaultDate: string;
+  categories: { id: string; name: string }[];
 };
 
 export function MarkPaidDialog(props: Props) {
@@ -44,13 +45,15 @@ export function MarkPaidDialog(props: Props) {
   );
 }
 
-function Body({ onOpenChange, bill, period, defaultDate }: Props) {
+function Body({ onOpenChange, bill, period, defaultDate, categories }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [amount, setAmount] = useState(centsToAmountInput(bill.amountCents));
   const [paidOn, setPaidOn] = useState(defaultDate);
-  const canCreate = Boolean(bill.categoryId);
-  const [createExpense, setCreateExpense] = useState(canCreate);
+  const [createExpense, setCreateExpense] = useState(true);
+  // Sin categoría en el fijo, se elige acá para el gasto.
+  const [categoryId, setCategoryId] = useState(bill.categoryId ?? "");
+  const missingCategory = createExpense && !categoryId;
   const sym = currencyMeta[bill.currency as Currency]?.symbol ?? "$";
 
   function confirm() {
@@ -60,13 +63,14 @@ function Body({ onOpenChange, bill, period, defaultDate }: Props) {
         period,
         amount,
         paidOn,
-        createExpense: canCreate && createExpense,
+        createExpense,
+        categoryId: createExpense ? categoryId : null,
       });
       if (!r.ok) {
         toast.error(r.error);
         return;
       }
-      toast.success(createExpense && canCreate ? "Pagado y registrado como gasto" : "Marcado como pagado");
+      toast.success(createExpense ? "Pagado y registrado como gasto" : "Marcado como pagado");
       onOpenChange(false);
       router.refresh();
     });
@@ -108,25 +112,39 @@ function Body({ onOpenChange, bill, period, defaultDate }: Props) {
           />
         </div>
 
-        <label
-          className={`flex items-start gap-2.5 rounded-lg border p-3 ${canCreate ? "" : "opacity-60"}`}
-        >
+        <label className="flex items-start gap-2.5 rounded-lg border p-3">
           <input
             type="checkbox"
             className="mt-0.5 size-5 shrink-0 accent-primary"
-            checked={canCreate && createExpense}
-            disabled={!canCreate}
+            checked={createExpense}
             onChange={(e) => setCreateExpense(e.target.checked)}
           />
           <span className="min-w-0">
             <span className="block font-medium">Registrarlo también como gasto</span>
             <span className="block text-xs text-muted-foreground">
-              {canCreate
-                ? "Si no lo registrás, no suma en Análisis ni en el balance."
-                : "Elegí una categoría en el fijo para registrarlo como gasto"}
+              Si no lo registrás, no suma en Análisis ni en el balance.
             </span>
           </span>
         </label>
+
+        {createExpense && !bill.categoryId && (
+          <div className="space-y-1.5">
+            <Label htmlFor="mp-category">Categoría del gasto</Label>
+            <select
+              id="mp-category"
+              className="h-10 w-full rounded-lg border border-input bg-[var(--field-surface)] px-2.5 text-sm"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+            >
+              <option value="">Elegí una categoría</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <DialogFooter>
@@ -137,7 +155,7 @@ function Body({ onOpenChange, bill, period, defaultDate }: Props) {
             </Button>
           }
         />
-        <Button className="h-10" disabled={pending} onClick={confirm}>
+        <Button className="h-10" disabled={pending || missingCategory} onClick={confirm}>
           {pending ? "Guardando…" : "Confirmar"}
         </Button>
       </DialogFooter>

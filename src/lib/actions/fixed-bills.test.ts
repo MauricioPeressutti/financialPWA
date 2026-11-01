@@ -396,6 +396,45 @@ describe("CA10 markFixedBillPaid registrando el gasto", () => {
     expect(fake.snapshot()).toEqual(before);
   });
 
+  it("si el fijo no tiene categoría usa la elegida en el diálogo", async () => {
+    const b = seedBill({ categoryId: null });
+    const r = await markFixedBillPaid({
+      billId: b.id as string,
+      period: P,
+      amount: "16.200",
+      paidOn: "2026-11-05",
+      createExpense: true,
+      categoryId: catServicios.id,
+    });
+    expect(r).toEqual({ ok: true });
+    const exps = fake.rows(T.expenses);
+    expect(exps).toHaveLength(1);
+    expect(exps[0]).toMatchObject({ categoryId: catServicios.id, amountCents: 1_620_000 });
+    expect(fake.rows(T.fixedBillPayments)[0]).toMatchObject({
+      expenseId: exps[0].id,
+      createdExpense: true,
+    });
+  });
+
+  it("rechaza una categoría elegida de otro equipo o de ingresos sin crear nada", async () => {
+    const b = seedBill({ categoryId: null });
+    const otherTeam = seedCategory({ teamId: TEAM2, name: "Servicios" });
+    const income = seedCategory({ teamId: TEAM1, name: "Sueldo", kind: "income" });
+    for (const cat of [otherTeam, income]) {
+      const before = fake.snapshot();
+      const r = await markFixedBillPaid({
+        billId: b.id as string,
+        period: P,
+        amount: "16.200",
+        paidOn: "2026-11-05",
+        createExpense: true,
+        categoryId: cat.id as string,
+      });
+      expect(r.ok).toBe(false);
+      expect(fake.snapshot()).toEqual(before);
+    }
+  });
+
   it("si falla el alta del pago no queda el gasto (atomicidad)", async () => {
     const b = seedBill({ categoryId: catServicios.id });
     fake.failNext("insert", T.fixedBillPayments);

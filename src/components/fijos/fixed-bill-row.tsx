@@ -186,6 +186,7 @@ export function FixedBillRow({
             bill={bill}
             period={period}
             defaultDate={defaultPaidOn(bill, period, today)}
+            categories={categories}
           />
           <LinkExpenseDialog
             open={linkOpen}

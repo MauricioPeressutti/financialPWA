@@ -243,6 +243,7 @@ export async function markFixedBillPaid(input: {
   amount: string;
   paidOn: string; // "YYYY-MM-DD"
   createExpense: boolean;
+  categoryId?: string | null; // para el gasto; si falta, la del fijo
 }): Promise<ActionResult> {
   const session = await requireTeam();
   const { user, team } = session;
@@ -256,13 +257,26 @@ export async function markFixedBillPaid(input: {
   if (!DATE_RE.test(input.paidOn ?? "")) return { ok: false, error: "Fecha inválida" };
 
   const withExpense = Boolean(input.createExpense);
+  const categoryId = input.categoryId || bill.categoryId;
   let fxRate = 1;
   if (withExpense) {
-    if (!bill.categoryId)
-      return {
-        ok: false,
-        error: "Elegí una categoría en el fijo para registrarlo como gasto",
-      };
+    if (!categoryId)
+      return { ok: false, error: "Elegí una categoría para registrarlo como gasto" };
+    if (categoryId !== bill.categoryId) {
+      if (!UUID_RE.test(categoryId)) return { ok: false, error: "Categoría inválida" };
+      const [cat] = await db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(
+          and(
+            eq(categories.id, categoryId),
+            eq(categories.teamId, team.id),
+            eq(categories.kind, "expense"),
+          ),
+        )
+        .limit(1);
+      if (!cat) return { ok: false, error: "Categoría inválida" };
+    }
     const fx = await fxForMovement(team, bill.currency);
     if (fx.error) return { ok: false, error: fx.error };
     fxRate = fx.fxRate;
@@ -289,14 +303,14 @@ export async function markFixedBillPaid(input: {
     return { ok: false, error: "No se pudo marcar como pagado" };
   }
 
-  if (withExpense && bill.categoryId) {
+  if (withExpense && categoryId) {
     let expenseId: string | null = null;
     try {
       const created = await insertExpense(team.id, user.id, {
         amountCents: cents,
         currency: bill.currency,
         fxRate,
-        categoryId: bill.categoryId,
+        categoryId,
         paymentMethod: bill.paymentMethod,
         description: bill.name,
         spentOn: input.paidOn,
