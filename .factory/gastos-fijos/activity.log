@@ -15,3 +15,5 @@
 2026-11-01 01:32:11 | ux-reviewer | ▶ inicia — UX review gastos-fijos
 2026-11-01 01:36:03 | ux-reviewer | ■ termina — UX review gastos-fijos
 2026-11-01 01:36:09 | orquestador | ux-reviewer: 0 ALTA / 6 MEDIA / 12 BAJA, estatico; pasa a checkpoint_entrega
+2026-11-01 11:28:46 | orquestador | checkpoint_entrega aprobado por el usuario; inicio entrega (deployer)
+2026-11-01 11:29:03 | deployer | ▶ inicia — Deliver gastos-fijos PR
