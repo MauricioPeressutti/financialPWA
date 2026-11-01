@@ -1,7 +1,5 @@
-// STUB creado por el test-writer (TDD, fase RED). Solo define el contrato
-// (tipos y firmas) que esperan los tests en src/lib/fixed-bills.test.ts.
-// El builder tiene que reemplazar cada `throw` por la implementación real.
-// Ver .factory/gastos-fijos/test-plan.md.
+// Lógica pura de gastos fijos (sin DB). Las fechas viajan como strings
+// "YYYY-MM-DD" y el "hoy"/"mes actual" se calcula en hora de Argentina.
 
 export type BillStatus = "pagado" | "pendiente" | "vencido";
 
@@ -55,46 +53,89 @@ export type RankedCandidate = {
   suggested: boolean;
 };
 
-function notImplemented(name: string): never {
-  throw new Error(`fixed-bills: ${name} no implementado (stub TDD)`);
+const TZ = "America/Argentina/Buenos_Aires";
+const DAY_MS = 86_400_000;
+
+const arDateFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function toUtcMs(isoDate: string): number {
+  return Date.parse(`${isoDate}T00:00:00Z`);
+}
+
+function fromUtcMs(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+function addDays(isoDate: string, days: number): string {
+  return fromUtcMs(toUtcMs(isoDate) + days * DAY_MS);
+}
+
+function periodOf(isoDate: string): string {
+  return `${isoDate.slice(0, 7)}-01`;
+}
+
+/**
+ * "YYYY-MM" o "YYYY-MM-DD" -> "YYYY-MM-01". null si no es un mes válido.
+ * Útil en las actions, donde un período inválido es un error.
+ */
+export function normalizePeriod(input?: string | null): string | null {
+  if (!input) return null;
+  const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(input.trim());
+  if (!m) return null;
+  const month = Number(m[2]);
+  if (month < 1 || month > 12) return null;
+  return `${m[1]}-${m[2]}-01`;
 }
 
 /** "YYYY-MM" -> "YYYY-MM-01". Inválido/undefined -> primer día del mes actual (hora AR). */
 export function parsePeriod(input?: string | null): string {
-  void input;
-  return notImplemented("parsePeriod");
+  return normalizePeriod(input) ?? periodOf(todayAR());
 }
 
 /** "YYYY-MM-DD" de hoy en America/Argentina/Buenos_Aires. */
 export function todayAR(now: Date = new Date()): string {
-  void now;
-  return notImplemented("todayAR");
+  return arDateFmt.format(now);
 }
 
 /** "2026-02-01" -> "2026-02-28" */
 export function periodLastDay(period: string): string {
-  void period;
-  return notImplemented("periodLastDay");
+  const y = Number(period.slice(0, 4));
+  const m = Number(period.slice(5, 7));
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return `${period.slice(0, 7)}-${pad(last)}`;
 }
 
 /** Fecha de vencimiento del período: min(dueDay, último día). null si no hay dueDay. */
 export function dueDateFor(period: string, dueDay: number | null): string | null {
-  void period;
-  void dueDay;
-  return notImplemented("dueDateFor");
+  if (dueDay == null) return null;
+  const last = Number(periodLastDay(period).slice(8, 10));
+  return `${period.slice(0, 7)}-${pad(Math.min(dueDay, last))}`;
 }
 
 /** "2026-11-01", +1 -> "2026-12-01"; -1 -> "2026-10-01" */
 export function shiftPeriod(period: string, delta: number): string {
-  void period;
-  void delta;
-  return notImplemented("shiftPeriod");
+  const y = Number(period.slice(0, 4));
+  const m = Number(period.slice(5, 7));
+  return fromUtcMs(Date.UTC(y, m - 1 + delta, 1));
 }
 
 /** Último período navegable: el mes siguiente al de `today`. */
 export function maxSelectablePeriod(today: string): string {
-  void today;
-  return notImplemented("maxSelectablePeriod");
+  return shiftPeriod(periodOf(today), 1);
+}
+
+/** Mes (día 1) de creación del fijo, en hora de Argentina. */
+function creationPeriod(bill: FixedBillLike): string {
+  return periodOf(todayAR(new Date(bill.createdAt)));
 }
 
 export function billAppliesTo(
@@ -102,10 +143,8 @@ export function billAppliesTo(
   period: string,
   payment?: FixedBillPaymentLike | null,
 ): boolean {
-  void bill;
-  void period;
-  void payment;
-  return notImplemented("billAppliesTo");
+  if (payment) return true;
+  return bill.active && period >= creationPeriod(bill);
 }
 
 export function billStatus(
@@ -114,17 +153,32 @@ export function billStatus(
   period: string,
   today: string,
 ): BillStatus {
-  void bill;
-  void payment;
-  void period;
-  void today;
-  return notImplemented("billStatus");
+  if (payment) return "pagado";
+  const due = dueDateFor(period, bill.dueDay);
+  return due && today > due ? "vencido" : "pendiente";
 }
 
 export function monthSummary(items: MonthItem[]): MonthSummary {
-  void items;
-  return notImplemented("monthSummary");
+  const byCurrency: MonthSummary["byCurrency"] = {};
+  const slot = (cur: string) =>
+    (byCurrency[cur] ??= { paidCents: 0, pendingCents: 0 });
+  let paidCount = 0;
+  for (const { bill, payment } of items) {
+    if (payment) {
+      paidCount++;
+      slot(payment.currency).paidCents += payment.amountCents;
+    } else {
+      slot(bill.currency).pendingCents += bill.amountCents;
+    }
+  }
+  return { paidCount, total: items.length, byCurrency };
 }
+
+const STATUS_RANK: Record<BillStatus, number> = {
+  vencido: 0,
+  pendiente: 1,
+  pagado: 2,
+};
 
 /** Orden de la lista: vencidos, pendientes por dueDay (sin dueDay al final), pagados. */
 export function sortMonthItems<T extends MonthItem>(
@@ -132,10 +186,18 @@ export function sortMonthItems<T extends MonthItem>(
   period: string,
   today: string,
 ): T[] {
-  void items;
-  void period;
-  void today;
-  return notImplemented("sortMonthItems");
+  const keyed = items.map((item) => ({
+    item,
+    rank: STATUS_RANK[billStatus(item.bill, item.payment, period, today)],
+    day: item.bill.dueDay ?? 99,
+  }));
+  keyed.sort(
+    (a, b) =>
+      a.rank - b.rank ||
+      a.day - b.day ||
+      a.item.bill.name.localeCompare(b.item.bill.name, "es"),
+  );
+  return keyed.map((k) => k.item);
 }
 
 /** Fecha por defecto del diálogo "Ya lo pagué". */
@@ -144,22 +206,33 @@ export function defaultPaidOn(
   period: string,
   today: string,
 ): string {
-  void bill;
-  void period;
-  void today;
-  return notImplemented("defaultPaidOn");
+  if (periodOf(today) === period) return today;
+  return dueDateFor(period, bill.dueDay) ?? periodLastDay(period);
+}
+
+function normalizeText(s: string): string {
+  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 }
 
 export function scoreCandidate(bill: FixedBillLike, expense: CandidateExpense): number {
-  void bill;
-  void expense;
-  return notImplemented("scoreCandidate");
+  let score = 0;
+  if (bill.categoryId && expense.categoryId === bill.categoryId) score += 40;
+
+  const name = normalizeText(bill.name);
+  if (name) {
+    const inDesc = expense.description ? normalizeText(expense.description).includes(name) : false;
+    const inEntity = expense.entity ? normalizeText(expense.entity).includes(name) : false;
+    if (inDesc || inEntity) score += 30;
+  }
+
+  if (Math.abs(expense.amountCents - bill.amountCents) <= 0.2 * bill.amountCents) score += 20;
+  if (expense.currency === bill.currency) score += 10;
+  return score;
 }
 
 /** Ventana de candidatas: [primer día − 5, último día + 5]. */
 export function candidateWindow(period: string): { from: string; to: string } {
-  void period;
-  return notImplemented("candidateWindow");
+  return { from: addDays(period, -5), to: addDays(periodLastDay(period), 5) };
 }
 
 export function rankLinkCandidates(
@@ -167,8 +240,22 @@ export function rankLinkCandidates(
   period: string,
   expenses: (CandidateExpense & { linked?: boolean })[],
 ): RankedCandidate[] {
-  void bill;
-  void period;
-  void expenses;
-  return notImplemented("rankLinkCandidates");
+  const { from, to } = candidateWindow(period);
+  const due = dueDateFor(period, bill.dueDay);
+  const distance = (spentOn: string) =>
+    due ? Math.abs(toUtcMs(spentOn) - toUtcMs(due)) : 0;
+
+  return expenses
+    .filter((e) => !e.linked && e.spentOn >= from && e.spentOn <= to)
+    .map((e) => {
+      const { linked: _linked, ...expense } = e;
+      void _linked;
+      return { expense, score: scoreCandidate(bill, expense), dist: distance(e.spentOn) };
+    })
+    .sort((a, b) => b.score - a.score || a.dist - b.dist)
+    .map((c, i) => ({
+      expense: c.expense,
+      score: c.score,
+      suggested: i < 3 && c.score >= 50,
+    }));
 }

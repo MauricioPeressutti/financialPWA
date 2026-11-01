@@ -5,20 +5,24 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-const TABS = [
+export const MOVIMIENTOS_TABS = [
   { href: "/movimientos", label: "Gastos" },
   { href: "/movimientos/ingresos", label: "Ingresos" },
+  { href: "/movimientos/fijos", label: "Fijos" },
 ];
+
+/** "Gastos" (/movimientos) solo en la ruta exacta; el resto, también en sus subrutas. */
+export function isMovimientosTabActive(href: string, pathname: string): boolean {
+  if (href === "/movimientos") return pathname === "/movimientos";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function MovimientosTabs() {
   const pathname = usePathname();
   return (
     <div className="flex rounded-lg bg-muted p-1 text-sm">
-      {TABS.map((t) => {
-        const active =
-          t.href === "/movimientos"
-            ? pathname === "/movimientos"
-            : pathname.startsWith(t.href);
+      {MOVIMIENTOS_TABS.map((t) => {
+        const active = isMovimientosTabActive(t.href, pathname);
         return (
           <Link
             key={t.href}

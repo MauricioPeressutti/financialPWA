@@ -47,6 +47,43 @@ export const incomeInput = z.object({
 });
 export type IncomeInput = z.infer<typeof incomeInput>;
 
+// Gasto fijo mensual. El monto se parsea aparte con parseAmountToCents.
+// userId/teamId del input se descartan (z.object hace strip de claves extra).
+export const fixedBillInput = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Poné un nombre")
+    .max(60, "El nombre puede tener hasta 60 caracteres"),
+  emoji: z.string().trim().max(16).optional().or(z.literal("")),
+  amount: z.string().trim().min(1, "Ingresá un monto"),
+  currency: z.string().optional().or(z.literal("")),
+  categoryId: z
+    .string()
+    .uuid("Categoría inválida")
+    .nullish()
+    .or(z.literal("")),
+  paymentMethod: z.enum(PAYMENT_METHODS).optional().or(z.literal("")),
+  dueDay: z
+    .union([z.string(), z.number(), z.null()])
+    .optional()
+    .transform((v, ctx) => {
+      if (v === null || v === undefined) return null;
+      const s = String(v).trim();
+      if (!s) return null;
+      const n = Number(s);
+      if (!/^\d+$/.test(s) || !Number.isInteger(n) || n < 1 || n > 31) {
+        ctx.addIssue({
+          code: "custom",
+          message: "El día de vencimiento tiene que ser entre 1 y 31",
+        });
+        return z.NEVER;
+      }
+      return n;
+    }),
+});
+export type FixedBillFormInput = z.input<typeof fixedBillInput>;
+
 export const categoryInput = z.object({
   name: z.string().min(1, "Nombre requerido").max(60),
   kind: z.enum(["expense", "income"]).default("expense"),
