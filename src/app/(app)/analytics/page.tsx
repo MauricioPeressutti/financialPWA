@@ -55,16 +55,20 @@ function Kpi({
   wide?: boolean;
 }) {
   return (
-    <div className={`rounded-xl border bg-card/40 p-3 ${wide ? "col-span-2" : ""}`}>
+    <div className={`min-w-0 rounded-xl border bg-card/40 p-3 ${wide ? "col-span-2" : ""}`}>
       <p className="text-[0.62rem] uppercase tracking-wide text-muted-foreground">{label}</p>
+      {/* La fuente baja con el viewport (montos de 8 dígitos en 360px) y,
+          como último recurso, el número corta de línea: nunca se trunca. */}
       <p
-        className={`mt-0.5 text-[1.02rem] font-semibold tabular-nums ${
+        className={`mt-0.5 text-[clamp(0.8rem,4vw,1.02rem)] font-semibold tabular-nums wrap-break-word ${
           tone === "pos" ? "text-emerald-500" : tone === "neg" ? "text-destructive" : ""
         }`}
       >
         {value}
       </p>
-      {sub ? <p className="text-[0.66rem] text-muted-foreground tabular-nums">{sub}</p> : null}
+      {sub ? (
+        <p className="text-[0.66rem] text-muted-foreground tabular-nums wrap-break-word">{sub}</p>
+      ) : null}
       {note ? (
         <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[0.6rem] font-medium text-amber-600 dark:text-amber-400">
           ⚠ {note}
@@ -156,7 +160,9 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
   const balancePos = k.balanceCents >= 0;
 
   return (
-    <div className="space-y-6">
+    // overflow-x-clip: solo red de seguridad (no crea contenedor de scroll ni
+    // rompe sticky); cada desborde se corrige en su componente.
+    <div className="space-y-6 overflow-x-clip">
       <h1 className="text-xl font-semibold">Análisis</h1>
 
       <div className="space-y-2">
@@ -186,7 +192,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                 Balance del período
               </p>
               <p
-                className={`mt-1 text-[2.4rem] font-bold leading-none ${
+                className={`mt-1 text-[clamp(1.5rem,8vw,2.4rem)] font-bold leading-none wrap-break-word ${
                   balancePos ? "text-emerald-500" : "text-destructive"
                 }`}
               >
@@ -481,7 +487,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                       <div className="min-w-0 flex-1">
                         <p className="truncate">{m.label}</p>
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <span>
+                          <span className="min-w-0 truncate">
                             {new Date(m.on + "T00:00:00").toLocaleDateString("es-AR", {
                               day: "numeric",
                               month: "short",
@@ -489,9 +495,9 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                             {m.createdBy ? ` · ${m.createdBy}` : ""} ·
                           </span>
                           {pos ? (
-                            <IncomeMethodTag method={m.method} />
+                            <IncomeMethodTag method={m.method} className="shrink-0 whitespace-nowrap" />
                           ) : (
-                            <PaymentMethodTag method={m.method} />
+                            <PaymentMethodTag method={m.method} className="shrink-0 whitespace-nowrap" />
                           )}
                         </p>
                       </div>
@@ -530,8 +536,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                     >
                       <span className="text-base leading-tight">{it.emoji}</span>
                       <div className="min-w-0">
-                        <p className="font-medium">{it.title}</p>
-                        <p className="text-muted-foreground">{it.detail}</p>
+                        <p className="font-medium wrap-break-word">{it.title}</p>
+                        <p className="text-muted-foreground wrap-break-word">{it.detail}</p>
                         <span
                           className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-wide"
                           style={{
@@ -558,7 +564,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps<"/analyt
                     className="flex items-start gap-2.5 rounded-xl border bg-card/40 p-3 text-[0.82rem] leading-snug"
                   >
                     <span className="text-base leading-tight">{i.emoji}</span>
-                    <span dangerouslySetInnerHTML={{ __html: i.text }} />
+                    <span className="min-w-0 wrap-break-word" dangerouslySetInnerHTML={{ __html: i.text }} />
                   </div>
                 ))}
               </div>
