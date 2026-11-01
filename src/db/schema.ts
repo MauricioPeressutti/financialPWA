@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -466,6 +467,57 @@ export const reimbursements = pgTable(
   (t) => [index("reimbursements_expense_idx").on(t.expenseId)],
 );
 
+// ─── Gastos fijos mensuales (por usuario dentro del equipo) ──
+export const fixedBills = pgTable(
+  "fixed_bills",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    emoji: text("emoji").notNull().default("🧾"),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(), // estimado
+    currency: text("currency").notNull().default("ARS"),
+    // Categoría que se usa al registrar el gasto ("Ya lo pagué")
+    categoryId: uuid("category_id").references(() => categories.id),
+    paymentMethod: paymentMethod("payment_method").notNull().default("debito"),
+    dueDay: integer("due_day"), // 1..31; null = sin vencimiento
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("fixed_bills_team_user_idx").on(t.teamId, t.userId)],
+);
+
+// Un pago por fijo y mes. El estado pendiente/vencido se calcula, no se guarda.
+export const fixedBillPayments = pgTable(
+  "fixed_bill_payments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    billId: uuid("bill_id")
+      .notNull()
+      .references(() => fixedBills.id, { onDelete: "cascade" }),
+    period: date("period").notNull(), // siempre día 1 del mes
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(), // real
+    currency: text("currency").notNull(), // la del gasto vinculado (o la del fijo)
+    paidOn: date("paid_on").notNull(),
+    expenseId: uuid("expense_id").references(() => expenses.id, {
+      onDelete: "set null",
+    }),
+    createdExpense: boolean("created_expense").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("fixed_bill_payments_bill_period_idx").on(t.billId, t.period),
+    uniqueIndex("fixed_bill_payments_expense_idx")
+      .on(t.expenseId)
+      .where(sql`expense_id is not null`),
+  ],
+);
+
 // ─── Tipos ─────────────────────────────────────────────
 export type User = typeof users.$inferSelect;
 export type Team = typeof teams.$inferSelect;
@@ -487,3 +539,5 @@ export type IncomeMethod = (typeof incomeMethod.enumValues)[number];
 export type CategoryKind = (typeof categoryKind.enumValues)[number];
 export type AiInsight = typeof aiInsights.$inferSelect;
 export type GameRound = typeof gameRounds.$inferSelect;
+export type FixedBill = typeof fixedBills.$inferSelect;
+export type FixedBillPayment = typeof fixedBillPayments.$inferSelect;
