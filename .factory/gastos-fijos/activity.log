@@ -1,0 +1,3 @@
+2026-11-01 00:00:00 | issue-analyst | spec.md escrita (tiene_ui=true, 28 CA, P1-P6 con default, nada bloquea)
+2026-11-01 00:00:00 | issue-analyst | state.json creado en etapa checkpoint_spec; rama feature/gastos-fijos NO creada (el analista no tiene git)
+2026-11-01 01:00:40 | orquestador | branch feature/gastos-fijos creada, bloqueo resuelto; en checkpoint_spec

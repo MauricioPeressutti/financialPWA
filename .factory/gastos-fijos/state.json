@@ -1,0 +1,30 @@
+{
+  "slug": "gastos-fijos",
+  "pedido": "modulo de gastos fijos mensuales por usuario: 'ya lo pague' o vincular a un gasto",
+  "branch": "feature/gastos-fijos",
+  "etapa": "checkpoint_spec",
+  "pr": null,
+  "intento": 0,
+  "max_intentos": 5,
+  "ux_vueltas": 0,
+  "tiene_ui": true,
+  "bloqueo": null,
+  "historial": [
+    {
+      "etapa": "preparacion",
+      "resultado": "parcial: state.json creado; rama pendiente (sin acceso a git)",
+      "fecha": "2026-11-01T00:00:00Z"
+    },
+    {
+      "etapa": "analisis",
+      "resultado": "ok: spec.md lista (tiene_ui=true, 28 CA, P1-P6 con default, nada bloquea)",
+      "fecha": "2026-11-01T00:00:00Z"
+    },
+    {
+      "etapa": "preparacion",
+      "resultado": "ok (branch creada por orquestador)",
+      "fecha": "2026-11-01T04:00:39Z"
+    }
+  ],
+  "actualizado": "2026-11-01T04:00:39Z"
+}
